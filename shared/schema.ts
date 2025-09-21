@@ -20,11 +20,7 @@ export const searchResults = pgTable("search_results", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   views: integer("views").default(0).notNull(),
   saves: integer("saves").default(0).notNull(),
-  // Full-text search columns for advanced indexing
-  searchVector: text("search_vector"), // tsvector for full-text search
 }, (table) => ({
-  // Full-text search indexes
-  searchVectorIdx: index("search_vector_idx").using("gin", sql`to_tsvector('english', coalesce(${table.query}, '') || ' ' || coalesce(${table.description}, '') || ' ' || coalesce(${table.platform}, ''))`),
   // Traditional indexes for performance
   platformIdx: index("platform_idx").on(table.platform),
   createdAtIdx: index("created_at_idx").on(table.createdAt),

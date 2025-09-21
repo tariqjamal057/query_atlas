@@ -91,7 +91,6 @@ export class DatabaseStorage implements IStorage {
         createdAt: searchResults.createdAt,
         views: searchResults.views,
         saves: searchResults.saves,
-        searchVector: searchResults.searchVector,
       })
       .from(searchResults)
       .where(
