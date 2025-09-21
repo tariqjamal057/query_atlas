@@ -78,7 +78,7 @@ export class DatabaseStorage implements IStorage {
 
     console.log(`🔍 Intent-based search for: "${cleanQuery}"`);
 
-    // Strict intent-based search: only return results where user intent matches entry topic/subject
+    // Strict intent-based search using only standard PostgreSQL full-text search
     return await db
       .select({
         id: searchResults.id,
@@ -92,16 +92,6 @@ export class DatabaseStorage implements IStorage {
         views: searchResults.views,
         saves: searchResults.saves,
         searchVector: searchResults.searchVector,
-        // Calculate intent-based relevance score
-        relevanceScore: sql<number>`
-          0.7 * ts_rank_cd(
-            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C'),
-            websearch_to_tsquery('english', ${cleanQuery}),
-            1|4
-          ) + 0.3 * GREATEST(similarity(lower(${searchResults.query}), lower(${cleanQuery})), 0)
-        `.as('relevanceScore')
       })
       .from(searchResults)
       .where(
@@ -115,26 +105,20 @@ export class DatabaseStorage implements IStorage {
           
           AND
           
-          -- Gate 2: Title/subject intent must match (strict)
-          (
-            -- Exact phrase match in title
-            to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery})
-            OR
-            -- High string similarity with title (handles pluralization, minor reordering)
-            similarity(lower(${searchResults.query}), lower(${cleanQuery})) >= 0.6
-          )
+          -- Gate 2: Title/subject intent must match (strict phrase matching)
+          to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery})
         `
       )
       .orderBy(
-        // Primary sort by intent-based relevance score
+        // Primary sort by intent-based relevance score (full-text search only)
         sql`
-          0.7 * ts_rank_cd(
+          ts_rank_cd(
             setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
             setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
             setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C'),
             websearch_to_tsquery('english', ${cleanQuery}),
             1|4
-          ) + 0.3 * GREATEST(similarity(lower(${searchResults.query}), lower(${cleanQuery})), 0)
+          )
         DESC`,
         // Secondary sort by popularity and recency
         desc(searchResults.views),
