@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSearchResultSchema, insertSearchQuerySchema } from "@shared/schema";
 import { z } from "zod";
+import archiver from "archiver";
+import * as fs from "fs";
+import * as path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get search results
@@ -109,6 +112,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  // Download Chrome extension as ZIP
+  app.get("/api/download-extension", async (req, res) => {
+    try {
+      const extensionDir = path.join(process.cwd(), "chrome-extension");
+      
+      // Check if extension directory exists
+      if (!fs.existsSync(extensionDir)) {
+        return res.status(404).json({ message: "Extension files not found" });
+      }
+
+      // Set response headers for ZIP download
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', 'attachment; filename="llm-archive-extension.zip"');
+
+      // Create ZIP archive
+      const archive = archiver('zip', {
+        zlib: { level: 9 } // Maximum compression
+      });
+
+      // Handle archive errors
+      archive.on('error', (err: archiver.ArchiverError) => {
+        console.error('Archive error:', err);
+        res.status(500).json({ message: "Failed to create extension package" });
+      });
+
+      // Pipe archive to response
+      archive.pipe(res);
+
+      // Add all files from chrome-extension directory
+      archive.directory(extensionDir, false);
+
+      // Finalize the archive
+      await archive.finalize();
+      
+    } catch (error) {
+      console.error('Extension download error:', error);
+      res.status(500).json({ message: "Failed to download extension" });
     }
   });
 

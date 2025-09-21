@@ -13,6 +13,30 @@ export default function Sidebar({ searchQuery, onSearch }: SidebarProps) {
     enabled: !!searchQuery,
   });
 
+  const handleDownloadExtension = async () => {
+    try {
+      // Download the extension ZIP file
+      const response = await fetch('/api/download-extension');
+      if (!response.ok) throw new Error('Failed to download extension');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'llm-archive-extension.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Show installation instructions
+      alert('Extension downloaded! To install:\n\n1. Extract the ZIP file\n2. Open Chrome and go to chrome://extensions/\n3. Enable "Developer mode" (top right)\n4. Click "Load unpacked" and select the extracted folder\n5. The LLM Archive extension is now installed!');
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download extension. Please try again.');
+    }
+  };
+
   const { data: popularSearches = [] } = useQuery<SearchQuery[]>({
     queryKey: ["/api/popular-searches"],
     enabled: !searchQuery,
@@ -103,6 +127,7 @@ export default function Sidebar({ searchQuery, onSearch }: SidebarProps) {
           Automatically capture and save your AI search results with our Chrome extension.
         </p>
         <button 
+          onClick={handleDownloadExtension}
           className="w-full bg-white text-primary py-2 rounded-md font-medium hover:bg-gray-50 transition-colors"
           data-testid="button-add-to-chrome"
         >

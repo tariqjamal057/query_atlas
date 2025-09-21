@@ -4,6 +4,30 @@ import { Menu, X } from "lucide-react";
 export default function NavigationHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const handleDownloadExtension = async () => {
+    try {
+      // Download the extension ZIP file
+      const response = await fetch('/api/download-extension');
+      if (!response.ok) throw new Error('Failed to download extension');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'llm-archive-extension.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Show installation instructions
+      alert('Extension downloaded! To install:\n\n1. Extract the ZIP file\n2. Open Chrome and go to chrome://extensions/\n3. Enable "Developer mode" (top right)\n4. Click "Load unpacked" and select the extracted folder\n5. The LLM Archive extension is now installed!');
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download extension. Please try again.');
+    }
+  };
+
   return (
     <header className="bg-card border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,6 +54,7 @@ export default function NavigationHeader() {
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Desktop Extension Button */}
             <button 
+              onClick={handleDownloadExtension}
               className="hidden sm:block bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
               data-testid="button-get-extension"
             >
@@ -38,6 +63,7 @@ export default function NavigationHeader() {
             
             {/* Mobile Extension Button */}
             <button 
+              onClick={handleDownloadExtension}
               className="sm:hidden bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
               data-testid="button-get-extension-mobile"
             >
