@@ -68,14 +68,79 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchSimilarResults(query: string, limit = 20): Promise<SearchResult[]> {
-    // Simple text similarity using ILIKE - in production, consider using full-text search
+    // Clean the search query
+    const cleanQuery = query.trim();
+    
+    if (!cleanQuery) {
+      // Fallback to recent results if no valid search terms
+      return await this.getSearchResults(limit);
+    }
+
+    console.log(`🔍 Intent-based search for: "${cleanQuery}"`);
+
+    // Strict intent-based search: only return results where user intent matches entry topic/subject
     return await db
-      .select()
+      .select({
+        id: searchResults.id,
+        query: searchResults.query,
+        publicLink: searchResults.publicLink,
+        platform: searchResults.platform,
+        description: searchResults.description,
+        preview: searchResults.preview,
+        submittedBy: searchResults.submittedBy,
+        createdAt: searchResults.createdAt,
+        views: searchResults.views,
+        saves: searchResults.saves,
+        searchVector: searchResults.searchVector,
+        // Calculate intent-based relevance score
+        relevanceScore: sql<number>`
+          0.7 * ts_rank_cd(
+            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C'),
+            websearch_to_tsquery('english', ${cleanQuery}),
+            1|4
+          ) + 0.3 * GREATEST(similarity(lower(${searchResults.query}), lower(${cleanQuery})), 0)
+        `.as('relevanceScore')
+      })
       .from(searchResults)
       .where(
-        sql`${searchResults.query} ILIKE ${`%${query}%`} OR ${searchResults.description} ILIKE ${`%${query}%`}`
+        sql`
+          -- Gate 1: Overall content must match (any field)
+          (
+            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C')
+          ) @@ websearch_to_tsquery('english', ${cleanQuery})
+          
+          AND
+          
+          -- Gate 2: Title/subject intent must match (strict)
+          (
+            -- Exact phrase match in title
+            to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery})
+            OR
+            -- High string similarity with title (handles pluralization, minor reordering)
+            similarity(lower(${searchResults.query}), lower(${cleanQuery})) >= 0.6
+          )
+        `
       )
-      .orderBy(desc(searchResults.views), desc(searchResults.createdAt))
+      .orderBy(
+        // Primary sort by intent-based relevance score
+        sql`
+          0.7 * ts_rank_cd(
+            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C'),
+            websearch_to_tsquery('english', ${cleanQuery}),
+            1|4
+          ) + 0.3 * GREATEST(similarity(lower(${searchResults.query}), lower(${cleanQuery})), 0)
+        DESC`,
+        // Secondary sort by popularity and recency
+        desc(searchResults.views),
+        desc(searchResults.saves),
+        desc(searchResults.createdAt)
+      )
       .limit(limit);
   }
 
@@ -134,13 +199,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRelatedSearches(query: string, limit = 5): Promise<SearchQuery[]> {
+    const tsquery = query.trim().split(/\s+/).map(word => word.replace(/[^\w]/g, '')).filter(word => word.length > 0).join(' & ');
+    
+    if (!tsquery) {
+      return [];
+    }
+
+    // Use advanced text similarity with PostgreSQL full-text search
     return await db
-      .select()
+      .select({
+        id: searchQueries.id,
+        query: searchQueries.query,
+        resultCount: searchQueries.resultCount,
+        lastSearched: searchQueries.lastSearched,
+        // Calculate similarity score
+        similarity: sql<number>`ts_rank_cd(
+          to_tsvector('english', ${searchQueries.query}),
+          plainto_tsquery('english', ${tsquery})
+        )`.as('similarity')
+      })
       .from(searchQueries)
       .where(
-        sql`${searchQueries.query} ILIKE ${`%${query}%`} AND ${searchQueries.query} != ${query}`
+        sql`to_tsvector('english', ${searchQueries.query}) @@ plainto_tsquery('english', ${tsquery})
+        AND ${searchQueries.query} != ${query}`
       )
-      .orderBy(desc(searchQueries.resultCount))
+      .orderBy(
+        // Sort by text similarity first, then by popularity
+        sql`ts_rank_cd(
+          to_tsvector('english', ${searchQueries.query}),
+          plainto_tsquery('english', ${tsquery})
+        ) DESC`,
+        desc(searchQueries.resultCount)
+      )
       .limit(limit);
   }
 

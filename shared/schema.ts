@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -20,14 +20,29 @@ export const searchResults = pgTable("search_results", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   views: integer("views").default(0).notNull(),
   saves: integer("saves").default(0).notNull(),
-});
+  // Full-text search columns for advanced indexing
+  searchVector: text("search_vector"), // tsvector for full-text search
+}, (table) => ({
+  // Full-text search indexes
+  searchVectorIdx: index("search_vector_idx").using("gin", sql`to_tsvector('english', coalesce(${table.query}, '') || ' ' || coalesce(${table.description}, '') || ' ' || coalesce(${table.platform}, ''))`),
+  // Traditional indexes for performance
+  platformIdx: index("platform_idx").on(table.platform),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+  viewsIdx: index("views_idx").on(table.views),
+  savesIdx: index("saves_idx").on(table.saves),
+}));
 
 export const searchQueries = pgTable("search_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   query: text("query").notNull(),
   resultCount: integer("result_count").default(0).notNull(),
   lastSearched: timestamp("last_searched").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Indexes for popular and related searches
+  queryIdx: index("query_idx").on(table.query),
+  resultCountIdx: index("result_count_idx").on(table.resultCount),
+  lastSearchedIdx: index("last_searched_idx").on(table.lastSearched),
+}));
 
 export const searchResultsRelations = relations(searchResults, ({ one }) => ({
   submitter: one(users, {
