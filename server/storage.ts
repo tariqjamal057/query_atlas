@@ -18,6 +18,9 @@ export interface IStorage {
   createOrUpdateSearchQuery(query: InsertSearchQuery): Promise<SearchQuery>;
   getPopularSearches(limit?: number): Promise<SearchQuery[]>;
   getRelatedSearches(query: string, limit?: number): Promise<SearchQuery[]>;
+  
+  // Statistics
+  getStats(): Promise<{totalResults: number, thisWeek: number, contributors: number, searchesToday: number}>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -115,6 +118,7 @@ export class DatabaseStorage implements IStorage {
         .values({
           ...queryData,
           resultCount: 1,
+          lastSearched: new Date(),
         })
         .returning();
       return newQuery;
@@ -138,6 +142,42 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(searchQueries.resultCount))
       .limit(limit);
+  }
+
+  async getStats(): Promise<{totalResults: number, thisWeek: number, contributors: number, searchesToday: number}> {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Get total results count
+    const [totalResultsRow] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(searchResults);
+    
+    // Get results from this week
+    const [thisWeekRow] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(searchResults)
+      .where(sql`${searchResults.createdAt} >= ${weekAgo}`);
+    
+    // Get unique contributors (submitted_by is not null)
+    const [contributorsRow] = await db
+      .select({ count: sql<number>`COUNT(DISTINCT ${searchResults.submittedBy})` })
+      .from(searchResults)
+      .where(sql`${searchResults.submittedBy} IS NOT NULL`);
+    
+    // Get searches today
+    const [searchesTodayRow] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(searchQueries)
+      .where(sql`${searchQueries.lastSearched} >= ${todayStart}`);
+    
+    return {
+      totalResults: Number(totalResultsRow.count) || 0,
+      thisWeek: Number(thisWeekRow.count) || 0,
+      contributors: Number(contributorsRow.count) || 0,
+      searchesToday: Number(searchesTodayRow.count) || 0,
+    };
   }
 }
 

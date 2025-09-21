@@ -105,18 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get archive statistics
   app.get("/api/stats", async (req, res) => {
     try {
-      // Get basic statistics
-      const [totalResults] = await storage.getSearchResults(1, 0);
-      const popularSearches = await storage.getPopularSearches(1);
-      
-      // Mock some statistics for now - in production, you'd calculate these from the database
-      const stats = {
-        totalResults: 15847,
-        thisWeek: 234,
-        contributors: 3421,
-        searchesToday: 1289,
-      };
-      
+      const stats = await storage.getStats();
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch statistics" });
