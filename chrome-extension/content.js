@@ -53,6 +53,16 @@ function getCurrentPlatformConfig() {
   return null;
 }
 
+// Get platform name in API-compatible format
+function getPlatformName() {
+  const hostname = window.location.hostname;
+  if (hostname.includes('chatgpt.com')) return 'ChatGPT';
+  if (hostname.includes('claude.ai')) return 'Claude';
+  if (hostname.includes('gemini.google.com')) return 'Gemini';
+  if (hostname.includes('chat.deepseek.com')) return 'DeepSeek';
+  return 'Other';
+}
+
 // Extract query from the page
 function extractQuery() {
   const config = getCurrentPlatformConfig();
@@ -131,14 +141,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const query = extractQuery() || extractTitle();
     const shareUrl = getShareUrl();
     const description = extractConversationSummary();
+    const platformName = getPlatformName();
     
     sendResponse({
       success: true,
       data: {
         query,
-        shareUrl,
+        publicLink: shareUrl, // Map shareUrl to publicLink for API compatibility
         description,
-        platform: getCurrentPlatformConfig() ? window.location.hostname : null
+        platform: platformName
       }
     });
     
@@ -150,6 +161,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const query = extractQuery() || extractTitle();
       const shareUrl = getShareUrl();
       const description = extractConversationSummary();
+      const platformName = getPlatformName();
       
       if (!query) {
         sendResponse({
@@ -159,12 +171,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       
+      if (!shareUrl) {
+        sendResponse({
+          success: false,
+          error: 'No public share link available. Please create a share link first.'
+        });
+        return;
+      }
+      
       sendResponse({
         success: true,
         data: {
           query,
-          shareUrl,
-          description
+          publicLink: shareUrl, // Map shareUrl to publicLink for API compatibility
+          description,
+          platform: platformName
         }
       });
     } catch (error) {

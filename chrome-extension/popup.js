@@ -56,7 +56,7 @@ async function detectCurrentPage() {
         const response = await chrome.tabs.sendMessage(tab.id, { action: 'getPageData' });
         if (response && response.success) {
           if (response.data.query) queryInput.value = response.data.query;
-          if (response.data.shareUrl) publicLinkInput.value = response.data.shareUrl;
+          if (response.data.publicLink) publicLinkInput.value = response.data.publicLink;
         }
       } catch (error) {
         console.log('Could not get page data from content script');
@@ -137,7 +137,7 @@ autoCaptureBtn.addEventListener('click', async () => {
     if (response && response.success) {
       // Fill form with captured data
       if (response.data.query) queryInput.value = response.data.query;
-      if (response.data.shareUrl) publicLinkInput.value = response.data.shareUrl;
+      if (response.data.publicLink) publicLinkInput.value = response.data.publicLink;
       if (response.data.description) descriptionInput.value = response.data.description;
       
       showStatus('Page data captured! Review and submit.', 'success');
