@@ -68,30 +68,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchSimilarResults(query: string, limit = 20): Promise<SearchResult[]> {
-    // Clean the search query
-    const cleanQuery = query.trim();
-    
-    if (!cleanQuery) {
-      // Fallback to recent results if no valid search terms
-      return await this.getSearchResults(limit);
-    }
+    try {
+      // Clean the search query
+      const cleanQuery = query.trim();
+      
+      if (!cleanQuery) {
+        // Fallback to recent results if no valid search terms
+        return await this.getSearchResults(limit);
+      }
 
-    console.log(`🔍 Complete semantic intent search for: "${cleanQuery}"`);
+      console.log(`🔍 Searching for: "${cleanQuery}"`);
 
-    // SOLUTION: Complete semantic intent matching - NO partial keyword matching
-    // Strategy: Only return results where search intent matches the complete topic/subject
+      // Use flexible search that combines multiple approaches for better results
+      const searchWords = cleanQuery.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+      console.log('Search words:', searchWords);
     
-    const searchWords = cleanQuery.toLowerCase().split(/\s+/).filter(word => word.length > 2);
-    const numSearchWords = searchWords.length;
-    
-    // RULE 1: Single word searches are almost never complete semantic intent - return empty
-    if (numSearchWords === 1) {
-      console.log(`❌ Single word search "${cleanQuery}" rejected - insufficient semantic intent`);
-      return [];
-    }
-    
-    // RULE 2: Multi-word searches require STRICT topic matching
-    return await db
+      return await db
       .select({
         id: searchResults.id,
         query: searchResults.query,
@@ -107,32 +99,43 @@ export class DatabaseStorage implements IStorage {
       .from(searchResults)
       .where(
         sql`
-          -- STRICT: All major search words must appear in the title (topic/subject)
-          -- This ensures the search intent matches the entry's complete topic
-          (
-            SELECT COUNT(*)::float / ${numSearchWords}
-            FROM unnest(${searchWords}::text[]) AS search_word
-            WHERE lower(${searchResults.query}) LIKE '%' || search_word || '%'
-          ) >= 0.8
-          
-          -- ADDITIONAL FILTER: Use phrase matching for word order/context validation
-          AND to_tsvector('english', coalesce(${searchResults.query}, '')) @@ websearch_to_tsquery('english', ${cleanQuery})
+          -- Multi-approach search for better recall:
+          -- 1. Full-text search on query and description
+          (to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')) 
+           @@ websearch_to_tsquery('english', ${cleanQuery}))
+          OR
+          -- 2. ILIKE search for partial matching on query
+          (${searchResults.query} ILIKE ${`%${cleanQuery}%`})
         `
       )
       .orderBy(
-        // Primary sort: Exact phrase match gets highest priority
+        // Smart ranking: exact phrase match > full-text relevance > partial match > recency
         sql`
           CASE 
-            WHEN to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery}) THEN 100
-            ELSE ts_rank_cd(to_tsvector('english', coalesce(${searchResults.query}, '')), websearch_to_tsquery('english', ${cleanQuery}))
+            -- Exact phrase match gets highest priority
+            WHEN lower(${searchResults.query}) ILIKE ${`%${cleanQuery.toLowerCase()}%`} THEN 1000
+            -- Full-text search relevance
+            WHEN to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')) 
+                 @@ websearch_to_tsquery('english', ${cleanQuery}) 
+            THEN 500 + ts_rank_cd(
+              to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')), 
+              websearch_to_tsquery('english', ${cleanQuery})
+            ) * 100
+            -- Word matching gets lower priority
+            ELSE 100
           END
         DESC`,
-        // Secondary sort by popularity and recency
+        // Secondary sort by engagement metrics
         desc(searchResults.views),
         desc(searchResults.saves),
         desc(searchResults.createdAt)
       )
       .limit(limit);
+    } catch (error) {
+      console.error('Search error:', error);
+      // Fallback to recent results on error
+      return await this.getSearchResults(limit);
+    }
   }
 
   async incrementViews(id: string): Promise<void> {

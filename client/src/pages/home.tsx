@@ -50,7 +50,7 @@ export default function Home() {
           <div className={`order-1 lg:order-2 transition-all duration-300 ${
             isSidebarOpen ? 'block' : 'hidden'
           } lg:block`}>
-            <Sidebar searchQuery={searchQuery} />
+            <Sidebar searchQuery={searchQuery} onSearch={handleSearch} />
           </div>
         </div>
       </main>

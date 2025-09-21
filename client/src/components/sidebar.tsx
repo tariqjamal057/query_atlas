@@ -4,9 +4,10 @@ import { SearchQuery } from "@shared/schema";
 
 interface SidebarProps {
   searchQuery: string;
+  onSearch?: (query: string) => void;
 }
 
-export default function Sidebar({ searchQuery }: SidebarProps) {
+export default function Sidebar({ searchQuery, onSearch }: SidebarProps) {
   const { data: relatedSearches = [] } = useQuery<SearchQuery[]>({
     queryKey: ["/api/related-searches", { q: searchQuery }],
     enabled: !!searchQuery,
@@ -43,13 +44,13 @@ export default function Sidebar({ searchQuery }: SidebarProps) {
                 key={search.id} 
                 className="flex items-center justify-between py-2 border-b border-border last:border-b-0"
               >
-                <a 
-                  href="#" 
-                  className="text-sm text-foreground hover:text-primary transition-colors"
+                <button 
+                  onClick={() => onSearch?.(search.query)} 
+                  className="text-sm text-foreground hover:text-primary transition-colors text-left"
                   data-testid={`link-search-${search.id}`}
                 >
                   {search.query}
-                </a>
+                </button>
                 <span 
                   className="text-xs text-muted-foreground"
                   data-testid={`text-count-${search.id}`}
