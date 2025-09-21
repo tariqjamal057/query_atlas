@@ -72,49 +72,51 @@ export default function SearchResults({ searchQuery, onSearch, showSearchBar }: 
       {showSearchBar && (
         <div className="bg-card rounded-lg border border-border p-6">
           <h2 className="text-2xl font-semibold text-foreground mb-6">Search Archive</h2>
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 type="text"
                 placeholder="Search for AI queries, topics, or keywords..."
                 value={currentQuery}
                 onChange={(e) => setCurrentQuery(e.target.value)}
-                className="w-full"
+                className="w-full h-12 text-base" 
                 data-testid="input-search-query"
               />
             </div>
             <Button 
               type="submit"
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center space-x-2 h-12 px-6"
               data-testid="button-search"
             >
               <Search className="w-5 h-5" />
               <span>Search</span>
             </Button>
           </form>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="text-sm text-muted-foreground">Popular searches:</span>
-            <button 
-              className="text-sm bg-muted text-muted-foreground px-3 py-1 rounded-full hover:bg-accent transition-colors"
-              onClick={() => onSearch("Machine Learning")}
-              data-testid="button-popular-ml"
-            >
-              Machine Learning
-            </button>
-            <button 
-              className="text-sm bg-muted text-muted-foreground px-3 py-1 rounded-full hover:bg-accent transition-colors"
-              onClick={() => onSearch("React Components")}
-              data-testid="button-popular-react"
-            >
-              React Components
-            </button>
-            <button 
-              className="text-sm bg-muted text-muted-foreground px-3 py-1 rounded-full hover:bg-accent transition-colors"
-              onClick={() => onSearch("Python Data Analysis")}
-              data-testid="button-popular-python"
-            >
-              Python Data Analysis
-            </button>
+          <div className="mt-4 space-y-2">
+            <span className="text-sm text-muted-foreground block">Popular searches:</span>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                className="text-sm bg-muted text-muted-foreground px-3 py-2 rounded-full hover:bg-accent transition-colors touch-manipulation"
+                onClick={() => onSearch("Machine Learning")}
+                data-testid="button-popular-ml"
+              >
+                Machine Learning
+              </button>
+              <button 
+                className="text-sm bg-muted text-muted-foreground px-3 py-2 rounded-full hover:bg-accent transition-colors touch-manipulation"
+                onClick={() => onSearch("React Components")}
+                data-testid="button-popular-react"
+              >
+                React Components
+              </button>
+              <button 
+                className="text-sm bg-muted text-muted-foreground px-3 py-2 rounded-full hover:bg-accent transition-colors touch-manipulation"
+                onClick={() => onSearch("Python Data Analysis")}
+                data-testid="button-popular-python"
+              >
+                Python Data Analysis
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -152,26 +154,29 @@ export default function SearchResults({ searchQuery, onSearch, showSearchBar }: 
         {displayResults.map((result: SearchResult) => (
           <div 
             key={result.id} 
-            className="bg-card rounded-lg border border-border p-6 search-result-card hover:shadow-md transition-shadow"
+            className="bg-card rounded-lg border border-border p-4 sm:p-6 search-result-card hover:shadow-md transition-shadow"
             data-testid={`card-result-${result.id}`}
           >
-            <div className="flex items-start justify-between mb-4">
+            {/* Mobile-first header */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 space-y-3 sm:space-y-0">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   {getPlatformIcon(result.platform)}
                 </div>
-                <div>
-                  <h4 className="font-medium text-foreground" data-testid={`text-query-${result.id}`}>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-medium text-foreground text-sm sm:text-base leading-tight" data-testid={`text-query-${result.id}`}>
                     {result.query}
                   </h4>
-                  <p className="text-sm text-muted-foreground" data-testid={`text-source-${result.id}`}>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1" data-testid={`text-source-${result.id}`}>
                     {result.platform} • {new Date(result.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              
+              {/* Mobile-friendly save button */}
+              <div className="flex items-center justify-end sm:justify-start">
                 <button 
-                  className="text-muted-foreground hover:text-foreground"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                   onClick={() => handleSaveResult(result)}
                   data-testid={`button-save-${result.id}`}
                 >
@@ -180,24 +185,32 @@ export default function SearchResults({ searchQuery, onSearch, showSearchBar }: 
               </div>
             </div>
             
+            {/* Preview text */}
             {result.preview && (
-              <p className="text-muted-foreground text-sm mb-4" data-testid={`text-preview-${result.id}`}>
+              <p className="text-muted-foreground text-sm mb-4 line-clamp-3" data-testid={`text-preview-${result.id}`}>
                 {result.preview}
               </p>
             )}
             
-            <div className="flex items-center justify-between">
+            {/* Mobile-optimized footer */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               <button
                 onClick={() => handleViewResult(result)}
-                className="inline-flex items-center space-x-2 text-primary hover:text-primary/80 font-medium text-sm"
+                className="inline-flex items-center justify-center sm:justify-start space-x-2 text-primary hover:text-primary/80 font-medium text-sm bg-primary/10 hover:bg-primary/20 px-4 py-2 rounded-md transition-colors"
                 data-testid={`link-view-${result.id}`}
               >
                 <ExternalLink className="w-4 h-4" />
                 <span>View Original Chat</span>
               </button>
-              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                <span data-testid={`text-views-${result.id}`}>{result.views} views</span>
-                <span data-testid={`text-saves-${result.id}`}>{result.saves} saves</span>
+              
+              {/* Stats */}
+              <div className="flex items-center justify-center sm:justify-end space-x-4 text-sm text-muted-foreground">
+                <span data-testid={`text-views-${result.id}`} className="flex items-center space-x-1">
+                  <span className="hidden sm:inline">views:</span><span>{result.views}</span>
+                </span>
+                <span data-testid={`text-saves-${result.id}`} className="flex items-center space-x-1">
+                  <span className="hidden sm:inline">saves:</span><span>{result.saves}</span>
+                </span>
               </div>
             </div>
           </div>

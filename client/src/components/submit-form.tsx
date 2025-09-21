@@ -52,7 +52,7 @@ export default function SubmitForm() {
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6">
+    <div className="bg-card rounded-lg border border-border p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-foreground mb-4">Submit Search Result</h3>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -61,10 +61,11 @@ export default function SubmitForm() {
             name="query"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Search Query</FormLabel>
+                <FormLabel className="text-sm font-medium">Search Query</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="What did you search for?"
+                    className="h-11 text-base"
                     {...field}
                     data-testid="input-submit-query"
                   />
@@ -79,11 +80,12 @@ export default function SubmitForm() {
             name="publicLink"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Public Share Link</FormLabel>
+                <FormLabel className="text-sm font-medium">Public Share Link</FormLabel>
                 <FormControl>
                   <Input 
                     type="url"
                     placeholder="https://chatgpt.com/share/..."
+                    className="h-11 text-base"
                     {...field}
                     data-testid="input-submit-link"
                   />
@@ -98,10 +100,10 @@ export default function SubmitForm() {
             name="platform"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>AI Platform</FormLabel>
+                <FormLabel className="text-sm font-medium">AI Platform</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid="select-submit-platform">
+                    <SelectTrigger className="h-11" data-testid="select-submit-platform">
                       <SelectValue placeholder="Select platform..." />
                     </SelectTrigger>
                   </FormControl>
@@ -123,12 +125,12 @@ export default function SubmitForm() {
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Description (optional)</FormLabel>
+                <FormLabel className="text-sm font-medium">Description (optional)</FormLabel>
                 <FormControl>
                   <Textarea 
                     rows={3}
                     placeholder="Brief description of the conversation..."
-                    className="resize-none"
+                    className="resize-none text-base min-h-[88px]"
                     {...field}
                     data-testid="textarea-submit-description"
                   />
@@ -140,7 +142,7 @@ export default function SubmitForm() {
 
           <Button 
             type="submit" 
-            className="w-full"
+            className="w-full h-12 text-base font-medium touch-manipulation"
             disabled={submitMutation.isPending}
             data-testid="button-submit-result"
           >

@@ -3,10 +3,12 @@ import HeroSection from "@/components/hero-section";
 import SearchResults from "@/components/search-results";
 import Sidebar from "@/components/sidebar";
 import { useState } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -19,16 +21,35 @@ export default function Home() {
       
       {!isSearchActive && <HeroSection onSearch={handleSearch} />}
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+        {/* Mobile Sidebar Toggle */}
+        <div className="lg:hidden mb-6">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="w-full flex items-center justify-between bg-card border border-border rounded-lg p-4 text-left hover:bg-muted transition-colors"
+            data-testid="button-toggle-sidebar"
+          >
+            <span className="font-medium text-foreground">
+              {isSidebarOpen ? 'Hide' : 'Show'} Sidebar
+            </span>
+            {isSidebarOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 order-2 lg:order-1">
             <SearchResults 
               searchQuery={searchQuery}
               onSearch={handleSearch}
               showSearchBar={isSearchActive}
             />
           </div>
-          <div>
+          
+          {/* Sidebar */}
+          <div className={`order-1 lg:order-2 transition-all duration-300 ${
+            isSidebarOpen ? 'block' : 'hidden'
+          } lg:block`}>
             <Sidebar searchQuery={searchQuery} />
           </div>
         </div>
