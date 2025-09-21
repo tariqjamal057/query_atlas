@@ -76,9 +76,21 @@ export class DatabaseStorage implements IStorage {
       return await this.getSearchResults(limit);
     }
 
-    console.log(`🔍 Intent-based search for: "${cleanQuery}"`);
+    console.log(`🔍 Complete semantic intent search for: "${cleanQuery}"`);
 
-    // Strict intent-based search using only standard PostgreSQL full-text search
+    // SOLUTION: Complete semantic intent matching - NO partial keyword matching
+    // Strategy: Only return results where search intent matches the complete topic/subject
+    
+    const searchWords = cleanQuery.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+    const numSearchWords = searchWords.length;
+    
+    // RULE 1: Single word searches are almost never complete semantic intent - return empty
+    if (numSearchWords === 1) {
+      console.log(`❌ Single word search "${cleanQuery}" rejected - insufficient semantic intent`);
+      return [];
+    }
+    
+    // RULE 2: Multi-word searches require STRICT topic matching
     return await db
       .select({
         id: searchResults.id,
@@ -95,29 +107,25 @@ export class DatabaseStorage implements IStorage {
       .from(searchResults)
       .where(
         sql`
-          -- Gate 1: Overall content must match (any field)
+          -- STRICT: All major search words must appear in the title (topic/subject)
+          -- This ensures the search intent matches the entry's complete topic
           (
-            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C')
-          ) @@ websearch_to_tsquery('english', ${cleanQuery})
+            SELECT COUNT(*)::float / ${numSearchWords}
+            FROM unnest(${searchWords}::text[]) AS search_word
+            WHERE lower(${searchResults.query}) LIKE '%' || search_word || '%'
+          ) >= 0.8
           
-          AND
-          
-          -- Gate 2: Title/subject intent must match (strict phrase matching)
-          to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery})
+          -- ADDITIONAL FILTER: Use phrase matching for word order/context validation
+          AND to_tsvector('english', coalesce(${searchResults.query}, '')) @@ websearch_to_tsquery('english', ${cleanQuery})
         `
       )
       .orderBy(
-        // Primary sort by intent-based relevance score (full-text search only)
+        // Primary sort: Exact phrase match gets highest priority
         sql`
-          ts_rank_cd(
-            setweight(to_tsvector('english', coalesce(${searchResults.query}, '')), 'A') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.description}, '')), 'B') ||
-            setweight(to_tsvector('english', coalesce(${searchResults.platform}, '')), 'C'),
-            websearch_to_tsquery('english', ${cleanQuery}),
-            1|4
-          )
+          CASE 
+            WHEN to_tsvector('english', coalesce(${searchResults.query}, '')) @@ phraseto_tsquery('english', ${cleanQuery}) THEN 100
+            ELSE ts_rank_cd(to_tsvector('english', coalesce(${searchResults.query}, '')), websearch_to_tsquery('english', ${cleanQuery}))
+          END
         DESC`,
         // Secondary sort by popularity and recency
         desc(searchResults.views),

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LLM Archive Extension Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .test-section { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        .instructions { background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .step { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 LLM Archive Extension Test</h1>
+        
+        <div class="instructions">
+            <h3>Testing Instructions:</h3>
+            <div class="step">1. Load this extension in Chrome (chrome://extensions/)</div>
+            <div class="step">2. Navigate to ChatGPT, Claude, Gemini, or DeepSeek</div>
+            <div class="step">3. Start a conversation or enter some text</div>
+            <div class="step">4. Click the LLM Archive extension icon</div>
+            <div class="step">5. Click "Auto-Capture Current Page"</div>
+            <div class="step">6. Check if data is captured properly</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Debug Console</h3>
+            <p>Open browser DevTools (F12) → Console tab to see debug logs when testing the extension.</p>
+            <p><strong>Expected logs when auto-capture works:</strong></p>
+            <ul>
+                <li>✅ "LLM Archive content script loaded on: [domain]"</li>
+                <li>✅ "Content script received message: autoCapture"</li>
+                <li>✅ "Starting autoCapture..."</li>
+                <li>✅ "Platform config: [object]"</li>
+                <li>✅ "Extracted data: {query, shareUrl, description, platformName}"</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🚨 Common Issues & Solutions</h3>
+            <p><strong>Issue:</strong> "Could not communicate with page"</p>
+            <p><strong>Solution:</strong> Refresh the page and try again</p>
+            
+            <p><strong>Issue:</strong> "No query found on page"</p>
+            <p><strong>Solution:</strong> Make sure you've entered text or started a conversation</p>
+            
+            <p><strong>Issue:</strong> "Platform not supported"</p>
+            <p><strong>Solution:</strong> Only works on ChatGPT, Claude, Gemini, and DeepSeek</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Extension Popup Features</h3>
+            <ul>
+                <li><strong>Auto-Capture:</strong> Automatically extracts query and URL from supported platforms</li>
+                <li><strong>Manual Entry:</strong> Fill out the form manually if auto-capture doesn't work</li>
+                <li><strong>Platform Detection:</strong> Automatically detects which platform you're on</li>
+                <li><strong>Statistics:</strong> Shows captured count and session count</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>✨ Test with Local Server</h3>
+            <p>Make sure your LLM Archive web application is running on:</p>
+            <p><code>http://localhost:5000</code></p>
+            <p>The extension will submit captured data to this endpoint.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -128,25 +128,60 @@ submitBtn.addEventListener('click', async () => {
 autoCaptureBtn.addEventListener('click', async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    console.log('Auto-capture clicked for tab:', tab.url);
     
     autoCaptureBtn.disabled = true;
     autoCaptureBtn.textContent = 'Capturing...';
     
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'autoCapture' });
+    // Check if this is a supported platform
+    const url = new URL(tab.url);
+    const supportedDomains = ['chatgpt.com', 'claude.ai', 'gemini.google.com', 'chat.deepseek.com'];
+    const isSupported = supportedDomains.some(domain => url.hostname.includes(domain));
     
-    if (response && response.success) {
-      // Fill form with captured data
-      if (response.data.query) queryInput.value = response.data.query;
-      if (response.data.publicLink) publicLinkInput.value = response.data.publicLink;
-      if (response.data.description) descriptionInput.value = response.data.description;
+    if (!isSupported) {
+      showStatus(`Platform ${url.hostname} is not supported. Please use ChatGPT, Claude, Gemini, or DeepSeek.`, 'error');
+      return;
+    }
+    
+    // Try to inject content script first (in case it's not loaded)
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+      console.log('Content script injected successfully');
       
-      showStatus('Page data captured! Review and submit.', 'success');
-    } else {
-      showStatus('Could not capture page data. This page may not be supported.', 'error');
+      // Wait a moment for content script to initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (injectionError) {
+      console.log('Content script injection failed (might already be loaded):', injectionError);
+    }
+    
+    // Send message to content script
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'autoCapture' });
+      console.log('Content script response:', response);
+      
+      if (response && response.success) {
+        // Fill form with captured data
+        if (response.data.query) queryInput.value = response.data.query;
+        if (response.data.publicLink) publicLinkInput.value = response.data.publicLink;
+        if (response.data.description) descriptionInput.value = response.data.description;
+        
+        showStatus('Page data captured! Review and submit.', 'success');
+      } else {
+        const errorMsg = response?.error || 'Unknown error occurred';
+        showStatus(`Capture failed: ${errorMsg}`, 'error');
+        console.error('Auto-capture failed:', response);
+      }
+    } catch (messageError) {
+      console.error('Message sending failed:', messageError);
+      showStatus('Could not communicate with page. Please refresh the page and try again.', 'error');
     }
     
   } catch (error) {
-    showStatus('Failed to capture page data', 'error');
+    console.error('Auto-capture error:', error);
+    showStatus(`Failed to capture: ${error.message}`, 'error');
   } finally {
     autoCaptureBtn.disabled = false;
     autoCaptureBtn.textContent = 'Auto-Capture Current Page';

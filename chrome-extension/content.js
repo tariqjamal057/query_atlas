@@ -1,42 +1,50 @@
 // Content script for LLM platforms
-console.log('LLM Archive content script loaded');
+console.log('LLM Archive content script loaded on:', window.location.hostname);
 
 // Platform-specific selectors and extractors
 const platformConfig = {
   'chatgpt.com': {
-    querySelector: 'textarea[placeholder*="Message"], [data-testid="user-input"] textarea',
+    querySelector: 'textarea[placeholder*="Message"], [data-testid="user-input"] textarea, textarea[data-id="root"]',
     shareButtonSelector: 'button[data-testid="share-button"], button:has(svg[data-icon="share"])',
-    conversationSelector: '[data-testid="conversation-turn"]',
-    titleSelector: 'h1, [data-testid="conversation-title"]',
+    conversationSelector: '[data-testid="conversation-turn"], .group, [role="presentation"]',
+    titleSelector: 'h1, [data-testid="conversation-title"], .text-lg',
     getShareUrl: () => {
-      // ChatGPT specific logic to get or create share URL
-      return window.location.href.includes('/c/') ? window.location.href : null;
+      // For ChatGPT, return current URL if it's a conversation
+      const url = window.location.href;
+      if (url.includes('/c/') || url.includes('chatgpt.com/g/') || url.includes('chatgpt.com/?') || url.includes('chat')) {
+        return url;
+      }
+      // If not a specific conversation, still return URL (user can create share link later)
+      return url;
     }
   },
   'claude.ai': {
-    querySelector: 'div[contenteditable="true"]',
+    querySelector: 'div[contenteditable="true"], textarea, [role="textbox"]',
     shareButtonSelector: 'button[aria-label*="Share"]',
-    conversationSelector: '.message',
-    titleSelector: '.conversation-title',
+    conversationSelector: '.message, [data-testid="user-message"], [data-testid="assistant-message"]',
+    titleSelector: '.conversation-title, h1, h2',
     getShareUrl: () => {
-      return window.location.href.includes('/chat/') ? window.location.href : null;
+      // Claude.ai - return current conversation URL
+      return window.location.href;
     }
   },
   'gemini.google.com': {
-    querySelector: 'div[contenteditable="true"]',
+    querySelector: 'div[contenteditable="true"], textarea, [role="textbox"]',
     shareButtonSelector: 'button[aria-label*="Share"]',
-    conversationSelector: '.conversation-container',
-    titleSelector: '.conversation-title',
+    conversationSelector: '.conversation-container, [data-test-id="message"]',
+    titleSelector: '.conversation-title, h1',
     getShareUrl: () => {
+      // Gemini - return current URL
       return window.location.href;
     }
   },
   'chat.deepseek.com': {
-    querySelector: 'textarea, div[contenteditable="true"]',
+    querySelector: 'textarea, div[contenteditable="true"], [role="textbox"]',
     shareButtonSelector: 'button[title*="Share"]',
-    conversationSelector: '.message',
-    titleSelector: '.chat-title',
+    conversationSelector: '.message, [data-testid="message"]',
+    titleSelector: '.chat-title, h1, h2',
     getShareUrl: () => {
+      // DeepSeek - return current URL
       return window.location.href;
     }
   }
@@ -68,15 +76,44 @@ function extractQuery() {
   const config = getCurrentPlatformConfig();
   if (!config) return null;
   
-  // Try to get the last user input
+  // Try to get the last user input from various sources
+  let query = '';
+  
+  // First try: Current input field
   const queryElements = document.querySelectorAll(config.querySelector);
-  if (queryElements.length === 0) return null;
+  if (queryElements.length > 0) {
+    const lastInput = queryElements[queryElements.length - 1];
+    query = lastInput.value || lastInput.textContent || lastInput.innerText;
+    if (query && query.trim()) {
+      return query.trim();
+    }
+  }
   
-  // Get the last input element
-  const lastInput = queryElements[queryElements.length - 1];
-  const query = lastInput.value || lastInput.textContent || lastInput.innerText;
+  // Second try: Look for user messages in conversation
+  const conversationElements = document.querySelectorAll(config.conversationSelector);
+  if (conversationElements.length > 0) {
+    // Find the last user message (usually odd-numbered or has specific class)
+    for (let i = conversationElements.length - 1; i >= 0; i--) {
+      const element = conversationElements[i];
+      const text = element.textContent || element.innerText;
+      
+      // Skip very short messages and look for substantive queries
+      if (text && text.trim().length > 10) {
+        return text.trim().substring(0, 200); // Limit to reasonable length
+      }
+    }
+  }
   
-  return query.trim();
+  // Third try: Any textarea or contenteditable element
+  const fallbackElements = document.querySelectorAll('textarea, [contenteditable="true"], [role="textbox"]');
+  for (const element of fallbackElements) {
+    const text = element.value || element.textContent || element.innerText;
+    if (text && text.trim().length > 5) {
+      return text.trim();
+    }
+  }
+  
+  return null;
 }
 
 // Extract conversation title or generate from first message
@@ -137,44 +174,64 @@ function extractConversationSummary() {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getPageData') {
-    const query = extractQuery() || extractTitle();
-    const shareUrl = getShareUrl();
-    const description = extractConversationSummary();
-    const platformName = getPlatformName();
-    
-    sendResponse({
-      success: true,
-      data: {
-        query,
-        publicLink: shareUrl, // Map shareUrl to publicLink for API compatibility
-        description,
-        platform: platformName
-      }
-    });
-    
-    return true; // Keep message channel open for async response
-  }
+  console.log('Content script received message:', request.action);
   
-  if (request.action === 'autoCapture') {
+  if (request.action === 'getPageData') {
     try {
       const query = extractQuery() || extractTitle();
       const shareUrl = getShareUrl();
       const description = extractConversationSummary();
       const platformName = getPlatformName();
       
+      console.log('getPageData extracted:', { query, shareUrl, description, platformName });
+      
+      sendResponse({
+        success: true,
+        data: {
+          query,
+          publicLink: shareUrl, // Map shareUrl to publicLink for API compatibility
+          description,
+          platform: platformName
+        }
+      });
+    } catch (error) {
+      console.error('getPageData error:', error);
+      sendResponse({
+        success: false,
+        error: error.message
+      });
+    }
+    
+    return true; // Keep message channel open for async response
+  }
+  
+  if (request.action === 'autoCapture') {
+    try {
+      console.log('Starting autoCapture...');
+      const platformConfig = getCurrentPlatformConfig();
+      console.log('Platform config:', platformConfig);
+      
+      const query = extractQuery() || extractTitle();
+      const shareUrl = getShareUrl();
+      const description = extractConversationSummary();
+      const platformName = getPlatformName();
+      
+      console.log('Extracted data:', { query, shareUrl, description, platformName });
+      
       if (!query) {
+        console.log('No query found, available elements:', document.querySelectorAll('textarea, [contenteditable="true"]').length);
         sendResponse({
           success: false,
-          error: 'No query found on page'
+          error: 'No query found on page. Make sure you have entered a question or have a conversation started.'
         });
         return;
       }
       
       if (!shareUrl) {
+        console.log('No share URL found, current URL:', window.location.href);
         sendResponse({
           success: false,
-          error: 'No public share link available. Please create a share link first.'
+          error: 'No public share link available. For ChatGPT, please create a share link first. For other platforms, the current page URL will be used.'
         });
         return;
       }
@@ -189,9 +246,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
     } catch (error) {
+      console.error('autoCapture error:', error);
       sendResponse({
         success: false,
-        error: error.message
+        error: `Failed to capture: ${error.message}`
       });
     }
     
