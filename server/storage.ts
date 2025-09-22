@@ -4,11 +4,13 @@ import { eq, ilike, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // Search Results
-  createSearchResult(result: InsertSearchResult): Promise<SearchResult>;
+  createSearchResult(result: InsertSearchResult, submittedBy?: string): Promise<SearchResult>;
   getSearchResults(limit?: number, offset?: number): Promise<SearchResult[]>;
   searchSimilarResults(query: string, limit?: number): Promise<SearchResult[]>;
   incrementViews(id: string): Promise<void>;
@@ -29,6 +31,16 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
@@ -42,7 +54,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createSearchResult(result: InsertSearchResult): Promise<SearchResult> {
+  async createSearchResult(result: InsertSearchResult, submittedBy?: string): Promise<SearchResult> {
     // Generate preview from description or query
     const preview = result.description 
       ? result.description.substring(0, 200) + (result.description.length > 200 ? "..." : "")
@@ -53,6 +65,7 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...result,
         preview,
+        submittedBy, // Server-side attribution, ignoring any client input
       })
       .returning();
     return searchResult;

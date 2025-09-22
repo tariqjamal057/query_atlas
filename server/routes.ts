@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSearchResultSchema, insertSearchQuerySchema } from "@shared/schema";
@@ -6,8 +6,195 @@ import { z } from "zod";
 import archiver from "archiver";
 import * as fs from "fs";
 import * as path from "path";
+import jwt from "jsonwebtoken";
+
+// Extend Request type for authenticated user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
+// JWT Authentication middleware
+const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Optional authentication middleware (for endpoints that work with or without auth)
+const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+      req.user = decoded;
+    } catch (error) {
+      // Token is invalid but we don't reject the request
+      req.user = null;
+    }
+  }
+  next();
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Google OAuth start endpoint
+  app.get('/api/auth/google/start', (req, res) => {
+    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const codeChallenge = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    // Get extension redirect URI if provided, otherwise use default callback
+    const extensionRedirect = req.query.extension_redirect as string;
+    const serverCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    
+    // Store state, code challenge, and extension redirect in cookies (secure in production)
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('oauth_state', state, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    res.cookie('oauth_challenge', codeChallenge, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    if (extensionRedirect) {
+      res.cookie('extension_redirect', extensionRedirect, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    }
+    
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      redirect_uri: serverCallbackUri, // Always use server callback, not extension URL
+      response_type: 'code',
+      scope: 'openid profile email',
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'plain'
+    });
+    
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    res.redirect(authUrl);
+  });
+  
+  // Google OAuth callback endpoint
+  app.get('/api/auth/google/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      const storedState = req.cookies?.oauth_state;
+      const codeChallenge = req.cookies?.oauth_challenge;
+      const extensionRedirect = req.cookies?.extension_redirect;
+      
+      if (!code || !state || state !== storedState) {
+        return res.status(400).send('Invalid OAuth callback');
+      }
+      
+      const serverCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+      
+      // Exchange code for tokens
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          code: code as string,
+          grant_type: 'authorization_code',
+          redirect_uri: serverCallbackUri, // Must match what was sent to Google
+          code_verifier: codeChallenge!
+        })
+      });
+      
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to exchange code for tokens');
+      }
+      
+      const tokens = await tokenResponse.json();
+      
+      // Get user info from Google
+      const userResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokens.access_token}`);
+      if (!userResponse.ok) {
+        throw new Error('Failed to get user info');
+      }
+      
+      const googleUser = await userResponse.json();
+      
+      // Create or update user in our database
+      let user = await storage.getUserByEmail(googleUser.email);
+      
+      if (!user) {
+        // User doesn't exist, create new user
+        user = await storage.createUser({
+          email: googleUser.email,
+          name: googleUser.name,
+          avatar_url: googleUser.picture,
+          google_id: googleUser.id
+        });
+      }
+      
+      // Create JWT token
+      const jwtToken = jwt.sign(
+        { 
+          userId: user.id, 
+          email: user.email!, 
+          name: user.name! 
+        },
+        process.env.JWT_SECRET!,
+        { expiresIn: '24h' }
+      );
+      
+      // Clear OAuth cookies
+      res.clearCookie('oauth_state');
+      res.clearCookie('oauth_challenge');
+      res.clearCookie('extension_redirect');
+      
+      // Check if this is a Chrome extension callback
+      if (extensionRedirect) {
+        // Chrome extension callback - redirect to extension with token in fragment
+        return res.redirect(`${extensionRedirect}#token=${jwtToken}&expires=${Date.now() + 24*60*60*1000}`);
+      }
+      
+      // For web app, redirect to success page with token in fragment
+      res.redirect(`/?auth=success#token=${jwtToken}`);
+      
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      res.status(500).send('Authentication failed');
+    }
+  });
+  
+  // Get current user info
+  app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.user.userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url
+      });
+    } catch (error) {
+      res.status(404).json({ message: 'User not found' });
+    }
+  });
+  
+  // Logout endpoint
+  app.post('/api/auth/logout', (req, res) => {
+    // Since we're using stateless JWT, logout is handled client-side
+    // by removing the token. We just acknowledge the request.
+    res.json({ message: 'Logged out successfully' });
+  });
   // Get search results
   app.get("/api/search-results", async (req, res) => {
     try {
@@ -39,11 +226,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Submit new search result
-  app.post("/api/search-results", async (req, res) => {
+  // Submit new search result (now requires authentication)
+  app.post("/api/search-results", authenticateToken, async (req, res) => {
     try {
       const validatedData = insertSearchResultSchema.parse(req.body);
-      const result = await storage.createSearchResult(validatedData);
+      // Server-side attribution - ignore any client submittedBy input
+      const result = await storage.createSearchResult(validatedData, req.user.userId);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {

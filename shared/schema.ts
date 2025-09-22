@@ -5,8 +5,13 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  username: text("username").unique(),
+  password: text("password"),
+  email: text("email").unique(),
+  name: text("name"),
+  avatar_url: text("avatar_url"),
+  google_id: text("google_id").unique(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const searchResults = pgTable("search_results", {
@@ -50,6 +55,15 @@ export const searchResultsRelations = relations(searchResults, ({ one }) => ({
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
+  name: true,
+  avatar_url: true,
+  google_id: true,
+}).extend({
+  email: z.string().email().optional(),
+  name: z.string().optional(),
+  avatar_url: z.string().url().optional(),
+  google_id: z.string().optional(),
 });
 
 export const insertSearchResultSchema = createInsertSchema(searchResults).pick({

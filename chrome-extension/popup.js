@@ -1,8 +1,42 @@
-// API endpoint - in production, this would be configurable
-const API_BASE = 'http://localhost:5000/api';
+// Environment detection and API configuration
+function getApiBase() {
+  // First check if user has manually configured an override
+  return new Promise(async (resolve) => {
+    const result = await chrome.storage.local.get(['apiBaseOverride']);
+    
+    if (result.apiBaseOverride) {
+      resolve(result.apiBaseOverride);
+      return;
+    }
+    
+    // Auto-detect environment
+    try {
+      const manifest = await chrome.management.getSelf();
+      if (manifest.installType === 'development') {
+        resolve('http://localhost:5000/api');
+      } else {
+        // Production environment - use the actual Replit domain
+        // This will be updated when the app is published
+        resolve('https://llmarchive-production.replit.app/api');
+      }
+    } catch (error) {
+      // Fallback to production
+      resolve('https://llmarchive-production.replit.app/api');
+    }
+  });
+}
+
+// Authentication state
+let currentUser = null;
+let API_BASE = '';
 
 // DOM elements
 const statusDiv = document.getElementById('status');
+const authSection = document.getElementById('auth-section');
+const mainSection = document.getElementById('main-section');
+const signInBtn = document.getElementById('signin-btn');
+const signOutBtn = document.getElementById('signout-btn');
+const userInfo = document.getElementById('user-info');
 const queryInput = document.getElementById('query');
 const publicLinkInput = document.getElementById('publicLink');
 const platformSelect = document.getElementById('platform');
@@ -14,8 +48,141 @@ const sessionCountSpan = document.getElementById('session-count');
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
+  API_BASE = await getApiBase();
+  await checkAuthStatus();
   await loadStats();
   await detectCurrentPage();
+});
+
+// Check authentication status
+async function checkAuthStatus() {
+  try {
+    const result = await chrome.storage.local.get(['authToken', 'tokenExpiry']);
+    
+    if (result.authToken && result.tokenExpiry && Date.now() < result.tokenExpiry) {
+      // Token exists and is valid, verify with server
+      try {
+        const response = await fetch(`${API_BASE}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${result.authToken}`
+          }
+        });
+        
+        if (response.ok) {
+          currentUser = await response.json();
+          showAuthenticated();
+          return;
+        }
+      } catch (error) {
+        console.log('Token validation failed:', error);
+      }
+    }
+    
+    // No valid token, show sign-in
+    showSignIn();
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    showSignIn();
+  }
+}
+
+// Show authenticated state
+function showAuthenticated() {
+  authSection.style.display = 'none';
+  mainSection.style.display = 'block';
+  
+  if (currentUser) {
+    userInfo.innerHTML = `
+      <div class="user-avatar">
+        <img src="${currentUser.avatar_url || 'icon16.png'}" width="24" height="24" style="border-radius: 50%;" />
+        <span>${currentUser.name || currentUser.email}</span>
+      </div>
+    `;
+    userInfo.style.display = 'block';
+  }
+}
+
+// Show sign-in state
+function showSignIn() {
+  authSection.style.display = 'block';
+  mainSection.style.display = 'none';
+  userInfo.style.display = 'none';
+  currentUser = null;
+}
+
+// Sign in with Google
+signInBtn.addEventListener('click', async () => {
+  try {
+    signInBtn.disabled = true;
+    signInBtn.textContent = 'Signing in...';
+    
+    // Get the Chrome extension redirect URI  
+    const extensionRedirectUri = chrome.identity.getRedirectURL();
+    
+    // Start OAuth flow - server will handle Google OAuth and then redirect to extension
+    const authUrl = `${API_BASE}/auth/google/start?extension_redirect=${encodeURIComponent(extensionRedirectUri)}`;
+    
+    const redirectUrl = await chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: true
+    });
+    
+    // Parse token from redirect URL
+    const url = new URL(redirectUrl);
+    const fragment = url.hash.substring(1);
+    const params = new URLSearchParams(fragment);
+    const token = params.get('token');
+    const expires = params.get('expires');
+    
+    if (token) {
+      // Store token
+      await chrome.storage.local.set({
+        authToken: token,
+        tokenExpiry: expires || Date.now() + 24*60*60*1000 // 24 hours default
+      });
+      
+      // Check auth status to update UI
+      await checkAuthStatus();
+      showStatus('Successfully signed in!', 'success');
+    } else {
+      throw new Error('No authentication token received');
+    }
+    
+  } catch (error) {
+    console.error('Sign in failed:', error);
+    showStatus(`Sign in failed: ${error.message}`, 'error');
+  } finally {
+    signInBtn.disabled = false;
+    signInBtn.textContent = 'Sign in with Google';
+  }
+});
+
+// Sign out
+signOutBtn.addEventListener('click', async () => {
+  try {
+    // Remove stored token
+    await chrome.storage.local.remove(['authToken', 'tokenExpiry']);
+    
+    // Call logout endpoint
+    if (currentUser) {
+      try {
+        await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await chrome.storage.local.get(['authToken'])).authToken}`
+          }
+        });
+      } catch (error) {
+        console.log('Logout endpoint call failed:', error);
+      }
+    }
+    
+    showSignIn();
+    showStatus('Successfully signed out', 'info');
+  } catch (error) {
+    console.error('Sign out failed:', error);
+    showStatus(`Sign out failed: ${error.message}`, 'error');
+  }
 });
 
 // Load statistics
@@ -67,8 +234,13 @@ async function detectCurrentPage() {
   }
 }
 
-// Submit search result
+// Submit search result (now requires authentication)
 submitBtn.addEventListener('click', async () => {
+  if (!currentUser) {
+    showStatus('Please sign in to submit results', 'error');
+    return;
+  }
+  
   const query = queryInput.value.trim();
   const publicLink = publicLinkInput.value.trim();
   const platform = platformSelect.value || 'Other';
@@ -88,10 +260,19 @@ submitBtn.addEventListener('click', async () => {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting...';
     
+    // Get stored auth token
+    const result = await chrome.storage.local.get(['authToken']);
+    if (!result.authToken) {
+      showStatus('Please sign in again', 'error');
+      showSignIn();
+      return;
+    }
+    
     const response = await fetch(`${API_BASE}/search-results`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${result.authToken}`
       },
       body: JSON.stringify({
         query,
@@ -102,6 +283,12 @@ submitBtn.addEventListener('click', async () => {
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        showStatus('Authentication expired. Please sign in again.', 'error');
+        await chrome.storage.local.remove(['authToken', 'tokenExpiry']);
+        showSignIn();
+        return;
+      }
       const error = await response.json();
       throw new Error(error.message || 'Failed to submit');
     }
@@ -126,6 +313,11 @@ submitBtn.addEventListener('click', async () => {
 
 // Auto-capture current page
 autoCaptureBtn.addEventListener('click', async () => {
+  if (!currentUser) {
+    showStatus('Please sign in to use auto-capture', 'error');
+    return;
+  }
+  
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     console.log('Auto-capture clicked for tab:', tab.url);

@@ -131,6 +131,48 @@
       padding-top: 16px;
       border-top: 1px solid #e5e7eb;
     }
+    
+    .auth-section {
+      text-align: center;
+      padding: 20px 0;
+    }
+    
+    .auth-section p {
+      margin-bottom: 20px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .user-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    
+    .user-avatar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .sign-out-btn {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    .sign-out-btn:hover {
+      background: #dc2626;
+    }
   </style>
 </head>
 <body>
@@ -144,8 +186,24 @@
   </div>
 
   <div id="status" class="status info" style="display: none;"></div>
+  
+  <!-- Authentication Section -->
+  <div id="auth-section" class="auth-section" style="display: none;">
+    <p>Please sign in with Google to submit search results to the archive.</p>
+    <button id="signin-btn">Sign in with Google</button>
+  </div>
+  
+  <!-- User Info (shown when authenticated) -->
+  <div id="user-info" class="user-info" style="display: none;">
+    <div class="user-avatar">
+      <span>User info will appear here</span>
+    </div>
+    <button id="signout-btn" class="sign-out-btn">Sign Out</button>
+  </div>
 
-  <div id="manual-form">
+  <!-- Main Form (shown when authenticated) -->
+  <div id="main-section" style="display: none;">
+    <div id="manual-form">
     <div class="form-group">
       <label for="query">Search Query</label>
       <input type="text" id="query" placeholder="What did you search for?">
@@ -173,13 +231,14 @@
       <textarea id="description" placeholder="Brief description of the conversation..."></textarea>
     </div>
 
-    <button id="submit-btn">Submit to Archive</button>
-    <button id="auto-capture-btn" class="secondary-button">Auto-Capture Current Page</button>
-  </div>
+      <button id="submit-btn">Submit to Archive</button>
+      <button id="auto-capture-btn" class="secondary-button">Auto-Capture Current Page</button>
+    </div>
 
-  <div class="stats">
-    <span>Captured: <span id="captured-count">0</span></span>
-    <span>This Session: <span id="session-count">0</span></span>
+    <div class="stats">
+      <span>Captured: <span id="captured-count">0</span></span>
+      <span>This Session: <span id="session-count">0</span></span>
+    </div>
   </div>
 
   <script src="popup.js"></script>
