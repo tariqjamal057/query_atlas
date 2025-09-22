@@ -236,6 +236,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Google token exchange endpoint for Chrome extension
+  app.post('/api/auth/google/exchange', async (req, res) => {
+    try {
+      const { google_token } = req.body;
+      
+      if (!google_token) {
+        return res.status(400).json({ error: 'Google token is required' });
+      }
+      
+      // Verify Google token using tokeninfo endpoint for better security
+      const tokenInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${google_token}`);
+      if (!tokenInfoResponse.ok) {
+        return res.status(400).json({ error: 'Invalid Google token' });
+      }
+      
+      const tokenInfo = await tokenInfoResponse.json();
+      
+      // Verify token was issued for our client and has required scopes
+      if (tokenInfo.audience !== process.env.GOOGLE_CLIENT_ID) {
+        return res.status(400).json({ error: 'Token not issued for this application' });
+      }
+      
+      const requiredScopes = ['openid', 'profile', 'email'];
+      const tokenScopes = tokenInfo.scope ? tokenInfo.scope.split(' ') : [];
+      const hasRequiredScopes = requiredScopes.every(scope => tokenScopes.includes(scope));
+      
+      if (!hasRequiredScopes) {
+        return res.status(400).json({ error: 'Token missing required scopes' });
+      }
+      
+      // Get user info from Google
+      const userResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${google_token}`);
+      if (!userResponse.ok) {
+        return res.status(400).json({ error: 'Failed to get user info' });
+      }
+      
+      const googleUser = await userResponse.json();
+      
+      // Create or update user in our database
+      let user = await storage.getUserByEmail(googleUser.email);
+      
+      if (!user) {
+        // User doesn't exist, create new user
+        user = await storage.createUser({
+          email: googleUser.email,
+          name: googleUser.name,
+          avatar_url: googleUser.picture,
+          google_id: googleUser.id
+        });
+      }
+      
+      // Create JWT token
+      const jwtToken = jwt.sign(
+        { 
+          userId: user.id, 
+          email: user.email!, 
+          name: user.name! 
+        },
+        process.env.JWT_SECRET!,
+        { expiresIn: '24h' }
+      );
+      
+      res.json({ 
+        jwt_token: jwtToken,
+        expires: Date.now() + 24*60*60*1000,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar_url: user.avatar_url
+        }
+      });
+      
+    } catch (error) {
+      console.error('Token exchange error:', error);
+      res.status(500).json({ error: 'Token exchange failed' });
+    }
+  });
+
   // Logout endpoint
   app.post('/api/auth/logout', (req, res) => {
     // Since we're using stateless JWT, logout is handled client-side

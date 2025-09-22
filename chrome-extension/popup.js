@@ -116,36 +116,44 @@ signInBtn.addEventListener('click', async () => {
     signInBtn.disabled = true;
     signInBtn.textContent = 'Signing in...';
     
-    // Get the Chrome extension redirect URI  
-    const extensionRedirectUri = chrome.identity.getRedirectURL();
-    
-    // Start OAuth flow - server will handle Google OAuth and then redirect to extension
-    const authUrl = `${API_BASE}/auth/google/start?extension_redirect=${encodeURIComponent(extensionRedirectUri)}`;
-    
-    const redirectUrl = await chrome.identity.launchWebAuthFlow({
-      url: authUrl,
-      interactive: true
+    // Use Chrome's built-in OAuth (wrap in Promise for compatibility)
+    const token = await new Promise((resolve, reject) => {
+      chrome.identity.getAuthToken({ interactive: true }, (token) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(token);
+        }
+      });
     });
     
-    // Parse token from redirect URL
-    const url = new URL(redirectUrl);
-    const fragment = url.hash.substring(1);
-    const params = new URLSearchParams(fragment);
-    const token = params.get('token');
-    const expires = params.get('expires');
-    
     if (token) {
-      // Store token
+      // Exchange Google token for our JWT token
+      const response = await fetch(`${API_BASE}/auth/google/exchange`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ google_token: token })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to exchange token');
+      }
+      
+      const data = await response.json();
+      
+      // Store our JWT token
       await chrome.storage.local.set({
-        authToken: token,
-        tokenExpiry: expires || Date.now() + 24*60*60*1000 // 24 hours default
+        authToken: data.jwt_token,
+        tokenExpiry: data.expires || Date.now() + 24*60*60*1000 // 24 hours default
       });
       
       // Check auth status to update UI
       await checkAuthStatus();
       showStatus('Successfully signed in!', 'success');
     } else {
-      throw new Error('No authentication token received');
+      throw new Error('No authentication token received from Google');
     }
     
   } catch (error) {
