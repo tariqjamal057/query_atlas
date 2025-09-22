@@ -7,6 +7,7 @@ import archiver from "archiver";
 import * as fs from "fs";
 import * as path from "path";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 // Extend Request type for authenticated user
 declare global {
@@ -56,17 +57,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Google OAuth start endpoint
   app.get('/api/auth/google/start', (req, res) => {
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const codeChallenge = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // Generate cryptographically secure state and PKCE verifier
+    const state = crypto.randomBytes(32).toString('base64url');
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
     
-    // Get extension redirect URI if provided, otherwise use default callback
+    // Validate extension redirect URI to prevent open redirect attacks
     const extensionRedirect = req.query.extension_redirect as string;
+    if (extensionRedirect) {
+      // Only allow chrome-extension:// URLs to prevent token exfiltration
+      if (!extensionRedirect.startsWith('chrome-extension://')) {
+        return res.status(400).json({ error: 'Invalid redirect URI. Only Chrome extension URLs are allowed.' });
+      }
+      
+      // Whitelist specific extension IDs for production security
+      const ALLOWED_EXTENSION_IDS = process.env.ALLOWED_EXTENSION_IDS?.split(',') || [];
+      if (ALLOWED_EXTENSION_IDS.length > 0) {
+        const isAllowed = ALLOWED_EXTENSION_IDS.some(id => 
+          extensionRedirect.startsWith(`chrome-extension://${id.trim()}/`)
+        );
+        if (!isAllowed) {
+          return res.status(400).json({ error: 'Unauthorized extension ID' });
+        }
+      }
+    }
     const serverCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
     
-    // Store state, code challenge, and extension redirect in cookies (secure in production)
+    // Store state, code verifier (not challenge), and extension redirect in cookies (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('oauth_state', state, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
-    res.cookie('oauth_challenge', codeChallenge, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
+    res.cookie('oauth_verifier', codeVerifier, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
     if (extensionRedirect) {
       res.cookie('extension_redirect', extensionRedirect, { httpOnly: true, secure: isProduction, sameSite: 'lax' });
     }
@@ -78,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       scope: 'openid profile email',
       state: state,
       code_challenge: codeChallenge,
-      code_challenge_method: 'plain'
+      code_challenge_method: 'S256'
     });
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -90,11 +110,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { code, state } = req.query;
       const storedState = req.cookies?.oauth_state;
-      const codeChallenge = req.cookies?.oauth_challenge;
+      const codeVerifier = req.cookies?.oauth_verifier;
       const extensionRedirect = req.cookies?.extension_redirect;
       
       if (!code || !state || state !== storedState) {
+        // Clear cookies on invalid callback
+        res.clearCookie('oauth_state');
+        res.clearCookie('oauth_verifier');
+        res.clearCookie('extension_redirect');
         return res.status(400).send('Invalid OAuth callback');
+      }
+      
+      if (!codeVerifier) {
+        // Clear cookies if verifier is missing/expired
+        res.clearCookie('oauth_state');
+        res.clearCookie('oauth_verifier');
+        res.clearCookie('extension_redirect');
+        return res.status(400).send('OAuth session expired');
       }
       
       const serverCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
@@ -109,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: code as string,
           grant_type: 'authorization_code',
           redirect_uri: serverCallbackUri, // Must match what was sent to Google
-          code_verifier: codeChallenge!
+          code_verifier: codeVerifier!
         })
       });
       
@@ -153,11 +185,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clear OAuth cookies
       res.clearCookie('oauth_state');
-      res.clearCookie('oauth_challenge');
+      res.clearCookie('oauth_verifier');
       res.clearCookie('extension_redirect');
       
       // Check if this is a Chrome extension callback
       if (extensionRedirect) {
+        // Validate redirect URI again (defense in depth)
+        if (!extensionRedirect.startsWith('chrome-extension://')) {
+          return res.status(400).json({ error: 'Invalid redirect URI' });
+        }
+        
+        // Re-check extension ID allowlist if configured
+        const ALLOWED_EXTENSION_IDS = process.env.ALLOWED_EXTENSION_IDS?.split(',') || [];
+        if (ALLOWED_EXTENSION_IDS.length > 0) {
+          const isAllowed = ALLOWED_EXTENSION_IDS.some(id => 
+            extensionRedirect.startsWith(`chrome-extension://${id.trim()}/`)
+          );
+          if (!isAllowed) {
+            return res.status(400).json({ error: 'Unauthorized extension ID' });
+          }
+        }
         // Chrome extension callback - redirect to extension with token in fragment
         return res.redirect(`${extensionRedirect}#token=${jwtToken}&expires=${Date.now() + 24*60*60*1000}`);
       }
