@@ -2,7 +2,6 @@
   "manifest_version": 3,
   "name": "LLM Archive", 
   "version": "1.0.0",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm8f8bDQGd+m6hL2iXK7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zV8kL7bQ3t1g1VmJ1yj8kL+nH5H7o8g9dR5wX1qLp7X2sN+zVQIDAQAB",
   "description": "Automatically capture and save AI search results from popular LLM platforms",
   "permissions": [
     "activeTab",
