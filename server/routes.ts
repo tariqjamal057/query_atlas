@@ -274,12 +274,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Submit new search result (now requires authentication)
+  // Submit new search result (authenticated users)
   app.post("/api/search-results", authenticateToken, async (req, res) => {
     try {
       const validatedData = insertSearchResultSchema.parse(req.body);
       // Server-side attribution - ignore any client submittedBy input
       const result = await storage.createSearchResult(validatedData, req.user.userId);
+      res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to create search result" });
+    }
+  });
+
+  // Submit new search result (anonymous users)
+  app.post("/api/search-results/anonymous", async (req, res) => {
+    try {
+      const validatedData = insertSearchResultSchema.parse(req.body);
+      // Anonymous submission - no user attribution
+      const result = await storage.createSearchResult(validatedData, undefined);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {

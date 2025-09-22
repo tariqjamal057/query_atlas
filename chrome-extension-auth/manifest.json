@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LLM Archive", 
+  "name": "LLM Archive (Authenticated)", 
   "version": "1.0.0",
-  "description": "Automatically capture and save AI search results from popular LLM platforms",
+  "description": "Secure extension requiring Google sign-in to save AI search results from popular LLM platforms",
   "permissions": [
     "activeTab",
     "storage",

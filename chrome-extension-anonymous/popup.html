@@ -19,7 +19,7 @@
     .logo {
       width: 32px;
       height: 32px;
-      background: #2563eb;
+      background: #16a34a;
       border-radius: 6px;
       margin-right: 12px;
       display: flex;
@@ -38,6 +38,12 @@
       font-size: 18px;
       font-weight: 600;
       color: #1f2937;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      color: #16a34a;
+      font-weight: 500;
     }
     
     .status {
@@ -93,7 +99,7 @@
     
     button {
       width: 100%;
-      background: #2563eb;
+      background: #16a34a;
       color: white;
       border: none;
       padding: 10px 16px;
@@ -105,7 +111,7 @@
     }
     
     button:hover {
-      background: #1d4ed8;
+      background: #15803d;
     }
     
     button:disabled {
@@ -132,46 +138,25 @@
       border-top: 1px solid #e5e7eb;
     }
     
-    .auth-section {
-      text-align: center;
-      padding: 20px 0;
-    }
-    
-    .auth-section p {
-      margin-bottom: 20px;
-      color: #6b7280;
-      font-size: 14px;
-    }
-    
-    .user-info {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: #f3f4f6;
+    .anonymous-info {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
       border-radius: 6px;
+      padding: 12px;
       margin-bottom: 16px;
       font-size: 13px;
+      color: #166534;
     }
     
-    .user-avatar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .sign-out-btn {
-      background: #ef4444;
+    .options-link {
+      background: #6b7280;
       color: white;
-      border: none;
-      padding: 4px 8px;
-      border-radius: 4px;
       font-size: 12px;
-      cursor: pointer;
+      padding: 6px 12px;
     }
     
-    .sign-out-btn:hover {
-      background: #dc2626;
+    .options-link:hover {
+      background: #4b5563;
     }
   </style>
 </head>
@@ -182,27 +167,20 @@
         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
     </div>
-    <h1>LLM Archive</h1>
+    <div>
+      <h1>LLM Archive</h1>
+      <div class="subtitle">Anonymous</div>
+    </div>
   </div>
 
   <div id="status" class="status info" style="display: none;"></div>
   
-  <!-- Authentication Section -->
-  <div id="auth-section" class="auth-section" style="display: none;">
-    <p>Please sign in with Google to submit search results to the archive.</p>
-    <button id="signin-btn">Sign in with Google</button>
-  </div>
-  
-  <!-- User Info (shown when authenticated) -->
-  <div id="user-info" class="user-info" style="display: none;">
-    <div class="user-avatar">
-      <span>User info will appear here</span>
-    </div>
-    <button id="signout-btn" class="sign-out-btn">Sign Out</button>
+  <div class="anonymous-info">
+    💡 This version allows anonymous submissions without requiring sign-in.
   </div>
 
-  <!-- Main Form (shown when authenticated) -->
-  <div id="main-section" style="display: none;">
+  <!-- Main Form (always visible) -->
+  <div id="main-section">
     <div id="manual-form">
     <div class="form-group">
       <label for="query">Search Query</label>
@@ -217,7 +195,6 @@
     <div class="form-group">
       <label for="platform">Platform</label>
       <select id="platform">
-        <option value="">Detect automatically</option>
         <option value="ChatGPT">ChatGPT</option>
         <option value="Claude">Claude</option>
         <option value="Gemini">Gemini</option>
@@ -232,11 +209,12 @@
     </div>
 
       <button id="submit-btn">Submit to Archive</button>
-      <button id="auto-capture-btn" class="secondary-button">Auto-Capture Current Page</button>
+      <button id="auto-capture-btn" class="secondary-button">🚀 Auto-Capture</button>
+      <button id="options-btn" class="options-link">⚙️ Options</button>
     </div>
 
     <div class="stats">
-      <span>Captured: <span id="captured-count">0</span></span>
+      <span>Total Captured: <span id="captured-count">0</span></span>
       <span>This Session: <span id="session-count">0</span></span>
     </div>
   </div>
