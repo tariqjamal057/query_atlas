@@ -11,7 +11,6 @@
     "notifications",
     "scripting",
     "alarms",
-    "identity",
     "management"
   ],
   "host_permissions": [
@@ -42,14 +41,6 @@
     "default_title": "LLM Archive"
   },
   "options_page": "options.html",
-  "oauth2": {
-    "client_id": "89999961014-0fqq881ur4ve9gu8j7p9tafrudamm494.apps.googleusercontent.com",
-    "scopes": [
-      "openid",
-      "profile", 
-      "email"
-    ]
-  },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",

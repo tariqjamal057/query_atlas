@@ -116,45 +116,79 @@ signInBtn.addEventListener('click', async () => {
     signInBtn.disabled = true;
     signInBtn.textContent = 'Signing in...';
     
-    // Use Chrome's built-in OAuth (wrap in Promise for compatibility)
-    const token = await new Promise((resolve, reject) => {
-      chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve(token);
-        }
-      });
+    // Use extension callback approach
+    const extensionCallbackUrl = chrome.runtime.getURL('oauth-callback.html');
+    const authUrl = `${API_BASE}/auth/google/start?extension_redirect=${encodeURIComponent(extensionCallbackUrl)}`;
+    
+    // Create a popup window for OAuth
+    const popup = await chrome.windows.create({
+      url: authUrl,
+      type: 'popup',
+      width: 500,
+      height: 600,
+      focused: true
     });
     
-    if (token) {
-      // Exchange Google token for our JWT token
-      const response = await fetch(`${API_BASE}/auth/google/exchange`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ google_token: token })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to exchange token');
+    // Check for authentication completion
+    const checkForAuth = async () => {
+      try {
+        const result = await chrome.storage.local.get(['authToken', 'tokenExpiry']);
+        if (result.authToken && result.tokenExpiry && Date.now() < result.tokenExpiry) {
+          // Authentication successful
+          await checkAuthStatus();
+          showStatus('Successfully signed in!', 'success');
+          
+          // Close popup if still open
+          try {
+            await chrome.windows.remove(popup.id);
+          } catch (e) {
+            // Popup already closed
+          }
+          
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.log('Auth check error:', error);
+        return false;
       }
-      
-      const data = await response.json();
-      
-      // Store our JWT token
-      await chrome.storage.local.set({
-        authToken: data.jwt_token,
-        tokenExpiry: data.expires || Date.now() + 24*60*60*1000 // 24 hours default
-      });
-      
-      // Check auth status to update UI
-      await checkAuthStatus();
-      showStatus('Successfully signed in!', 'success');
-    } else {
-      throw new Error('No authentication token received from Google');
-    }
+    };
+    
+    // Poll for authentication every 1 second
+    const interval = setInterval(async () => {
+      try {
+        const authenticated = await checkForAuth();
+        if (authenticated) {
+          clearInterval(interval);
+        } else {
+          // Check if popup was closed
+          try {
+            await chrome.windows.get(popup.id);
+          } catch (error) {
+            // Popup was closed without authentication
+            clearInterval(interval);
+            showStatus('Authentication was cancelled', 'error');
+          }
+        }
+      } catch (error) {
+        console.log('Auth polling error:', error);
+        clearInterval(interval);
+        showStatus('Authentication error occurred', 'error');
+      }
+    }, 1000);
+    
+    // Also check when popup is removed
+    const onWindowRemoved = async (windowId) => {
+      if (windowId === popup.id) {
+        clearInterval(interval);
+        chrome.windows.onRemoved.removeListener(onWindowRemoved);
+        const authenticated = await checkForAuth();
+        if (!authenticated) {
+          showStatus('Authentication was cancelled', 'error');
+        }
+      }
+    };
+    chrome.windows.onRemoved.addListener(onWindowRemoved);
     
   } catch (error) {
     console.error('Sign in failed:', error);
