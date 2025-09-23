@@ -11,9 +11,8 @@ function getApiBase() {
       return;
     }
     
-    // Default to localhost for development, can be overridden in options
-    // Users can change this in the options page if using a different server
-    resolve('http://localhost:5000/api');
+    // Default to production API, can be overridden in options
+    resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
   });
 }
 

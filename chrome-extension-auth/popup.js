@@ -9,19 +9,8 @@ function getApiBase() {
       return;
     }
     
-    // Auto-detect environment
-    try {
-      const manifest = await chrome.management.getSelf();
-      if (manifest.installType === 'development') {
-        resolve('http://localhost:5000/api');
-      } else {
-        // Production environment - use the actual Replit domain
-        resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
-      }
-    } catch (error) {
-      // Fallback to production
-      resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
-    }
+    // Always use production API - you can override in options if needed
+    resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
   });
 }
 
