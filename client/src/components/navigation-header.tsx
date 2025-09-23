@@ -33,22 +33,22 @@ export default function NavigationHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <svg className="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
               </div>
               <h1 className="text-lg sm:text-xl font-semibold text-foreground">LLM Archive</h1>
-            </div>
+            </a>
           </div>
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Dashboard</a>
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Submit</a>
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Browse</a>
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Extension</a>
+            <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">Dashboard</a>
+            <a href="/submit" className="text-muted-foreground hover:text-foreground transition-colors">Submit</a>
+            <a href="/browse" className="text-muted-foreground hover:text-foreground transition-colors">Browse</a>
+            <a href="/extension" className="text-muted-foreground hover:text-foreground transition-colors">Extension</a>
           </nav>
           
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -89,28 +89,28 @@ export default function NavigationHeader() {
           <div className="md:hidden border-t border-border bg-card">
             <nav className="py-4 space-y-2">
               <a 
-                href="#" 
+                href="/dashboard" 
                 className="block px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 data-testid="link-mobile-dashboard"
               >
                 Dashboard
               </a>
               <a 
-                href="#" 
+                href="/submit" 
                 className="block px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 data-testid="link-mobile-submit"
               >
                 Submit
               </a>
               <a 
-                href="#" 
+                href="/browse" 
                 className="block px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 data-testid="link-mobile-browse"
               >
                 Browse
               </a>
               <a 
-                href="#" 
+                href="/extension" 
                 className="block px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 data-testid="link-mobile-extension"
               >
