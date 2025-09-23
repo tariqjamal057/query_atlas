@@ -16,12 +16,11 @@ function getApiBase() {
         resolve('http://localhost:5000/api');
       } else {
         // Production environment - use the actual Replit domain
-        // This will be updated when the app is published
-        resolve('https://llmarchive-production.replit.app/api');
+        resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
       }
     } catch (error) {
       // Fallback to production
-      resolve('https://llmarchive-production.replit.app/api');
+      resolve('https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app/api');
     }
   });
 }

@@ -33,7 +33,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:5000',
     'https://localhost:5000',
-    process.env.FRONTEND_URL || 'https://your-domain.replit.app'
+    process.env.FRONTEND_URL || 'https://ury-ats-rndmurlSha20077xh72nsshnz8-007.replit.app'
   ];
   
   // Allow chrome extension origins
