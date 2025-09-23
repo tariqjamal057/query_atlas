@@ -92,63 +92,170 @@ export class DatabaseStorage implements IStorage {
 
       console.log(`🔍 Searching for: "${cleanQuery}"`);
 
-      // Use flexible search that combines multiple approaches for better results
-      const searchWords = cleanQuery.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+      // Enhanced search with intelligent keyword matching
+      const searchWords = cleanQuery.toLowerCase()
+        .split(/\s+/)
+        .map(word => word.replace(/[^\w]/g, ''))
+        .filter(word => word.length > 2);
+      
       console.log('Search words:', searchWords);
-    
-      return await db
-      .select({
-        id: searchResults.id,
-        query: searchResults.query,
-        publicLink: searchResults.publicLink,
-        platform: searchResults.platform,
-        description: searchResults.description,
-        preview: searchResults.preview,
-        submittedBy: searchResults.submittedBy,
-        createdAt: searchResults.createdAt,
-        views: searchResults.views,
-        saves: searchResults.saves,
-      })
-      .from(searchResults)
-      .where(
-        sql`
-          -- Multi-approach search for better recall:
-          -- 1. Full-text search on query and description
-          (to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')) 
-           @@ websearch_to_tsquery('english', ${cleanQuery}))
-          OR
-          -- 2. ILIKE search for partial matching on query
-          (${searchResults.query} ILIKE ${`%${cleanQuery}%`})
-        `
-      )
-      .orderBy(
-        // Smart ranking: exact phrase match > full-text relevance > partial match > recency
-        sql`
-          CASE 
-            -- Exact phrase match gets highest priority
-            WHEN lower(${searchResults.query}) ILIKE ${`%${cleanQuery.toLowerCase()}%`} THEN 1000
-            -- Full-text search relevance
-            WHEN to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')) 
-                 @@ websearch_to_tsquery('english', ${cleanQuery}) 
-            THEN 500 + ts_rank_cd(
-              to_tsvector('english', coalesce(${searchResults.query}, '') || ' ' || coalesce(${searchResults.description}, '')), 
-              websearch_to_tsquery('english', ${cleanQuery})
-            ) * 100
-            -- Word matching gets lower priority
-            ELSE 100
-          END
-        DESC`,
-        // Secondary sort by engagement metrics
-        desc(searchResults.views),
-        desc(searchResults.saves),
-        desc(searchResults.createdAt)
-      )
-      .limit(limit);
+
+      // Get all results for intelligent filtering
+      const allResults = await db
+        .select({
+          id: searchResults.id,
+          query: searchResults.query,
+          publicLink: searchResults.publicLink,
+          platform: searchResults.platform,
+          description: searchResults.description,
+          preview: searchResults.preview,
+          submittedBy: searchResults.submittedBy,
+          createdAt: searchResults.createdAt,
+          views: searchResults.views,
+          saves: searchResults.saves,
+        })
+        .from(searchResults);
+
+      // Advanced semantic matching with 70% keyword threshold
+      const scoredResults = allResults.map(result => {
+        const combinedText = `${result.query} ${result.description || ''}`.toLowerCase();
+        const resultWords = combinedText
+          .split(/\s+/)
+          .map(word => word.replace(/[^\w]/g, ''))
+          .filter(word => word.length > 2);
+
+        let score = 0;
+        let matchedWords = 0;
+
+        // Calculate keyword matching score
+        for (const searchWord of searchWords) {
+          let wordMatched = false;
+          
+          // Direct match
+          if (resultWords.includes(searchWord)) {
+            matchedWords++;
+            score += 100;
+            wordMatched = true;
+          } else {
+            // Partial/fuzzy matching for better recall
+            for (const resultWord of resultWords) {
+              // Check if words share significant similarity (70% threshold)
+              const similarity = this.calculateWordSimilarity(searchWord, resultWord);
+              if (similarity >= 0.7) {
+                matchedWords++;
+                score += 70 * similarity;
+                wordMatched = true;
+                break;
+              }
+              
+              // Contains matching (one word contains the other)
+              if (searchWord.length > 3 && resultWord.includes(searchWord)) {
+                matchedWords++;
+                score += 60;
+                wordMatched = true;
+                break;
+              }
+              if (resultWord.length > 3 && searchWord.includes(resultWord)) {
+                matchedWords++;
+                score += 60;
+                wordMatched = true;
+                break;
+              }
+            }
+          }
+
+          // Boost score for exact phrase matches
+          if (combinedText.includes(cleanQuery.toLowerCase())) {
+            score += 200;
+          }
+          
+          // Boost for query title matches
+          if (result.query.toLowerCase().includes(searchWord)) {
+            score += 50;
+          }
+        }
+
+        // Calculate keyword match percentage
+        const keywordMatchPercentage = searchWords.length > 0 ? matchedWords / searchWords.length : 0;
+        
+        // Apply 70% keyword matching threshold
+        if (keywordMatchPercentage >= 0.7) {
+          score += 100; // Bonus for meeting 70% threshold
+        }
+
+        // Additional semantic bonuses
+        if (keywordMatchPercentage === 1.0) {
+          score += 150; // Perfect keyword match
+        }
+
+        // Engagement boost
+        score += result.views * 2 + result.saves * 5;
+
+        // Recency boost (newer results get slight preference)
+        const daysSinceCreated = (Date.now() - new Date(result.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceCreated < 7) {
+          score += 10;
+        }
+
+        return {
+          ...result,
+          score,
+          keywordMatchPercentage,
+          matchedWords: matchedWords
+        };
+      });
+
+      // Filter results that meet minimum relevance criteria
+      const relevantResults = scoredResults.filter(result => 
+        result.score > 50 || // Has some relevance score
+        result.keywordMatchPercentage >= 0.5 || // At least 50% keyword match
+        result.query.toLowerCase().includes(cleanQuery.toLowerCase()) // Direct query match
+      );
+
+      // Sort by relevance score and return top results
+      const finalResults = relevantResults
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(({ score, keywordMatchPercentage, matchedWords, ...result }) => result);
+
+      console.log(`Found ${finalResults.length} relevant results (${relevantResults.length} total scored results)`);
+      
+      return finalResults;
     } catch (error) {
       console.error('Search error:', error);
       // Fallback to recent results on error
       return await this.getSearchResults(limit);
     }
+  }
+
+  // Helper function to calculate word similarity using Levenshtein distance
+  private calculateWordSimilarity(word1: string, word2: string): number {
+    const maxLength = Math.max(word1.length, word2.length);
+    if (maxLength === 0) return 1;
+    
+    const distance = this.levenshteinDistance(word1, word2);
+    return 1 - distance / maxLength;
+  }
+
+  // Levenshtein distance algorithm for fuzzy matching
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1, // deletion
+          matrix[j - 1][i] + 1, // insertion
+          matrix[j - 1][i - 1] + indicator // substitution
+        );
+      }
+    }
+
+    return matrix[str2.length][str1.length];
   }
 
   async incrementViews(id: string): Promise<void> {
