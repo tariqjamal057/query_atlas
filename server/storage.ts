@@ -205,12 +205,12 @@ export class DatabaseStorage implements IStorage {
         };
       });
 
-      // Filter results that meet minimum relevance criteria
-      const relevantResults = scoredResults.filter(result => 
-        result.score > 50 || // Has some relevance score
-        result.keywordMatchPercentage >= 0.5 || // At least 50% keyword match
-        result.query.toLowerCase().includes(cleanQuery.toLowerCase()) // Direct query match
-      );
+      // Filter results that meet 70% keyword matching threshold
+      const relevantResults = scoredResults.filter(result => {
+        const combinedText = `${result.query} ${result.description || ''}`.toLowerCase();
+        return result.keywordMatchPercentage >= 0.7 || // 70% keyword match threshold
+               combinedText.includes(cleanQuery.toLowerCase()); // OR exact phrase match
+      });
 
       // Sort by relevance score and return top results
       const finalResults = relevantResults
