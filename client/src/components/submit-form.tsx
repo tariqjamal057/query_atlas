@@ -27,7 +27,7 @@ export default function SubmitForm() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: InsertSearchResult) => {
-      const response = await apiRequest("POST", "/api/search-results", data);
+      const response = await apiRequest("POST", "/api/search-results/anonymous", data);
       return response.json();
     },
     onSuccess: () => {
