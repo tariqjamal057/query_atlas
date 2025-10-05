@@ -7,6 +7,7 @@ This is the **simple, anonymous version** of the LLM Archive Chrome extension th
 - 🚀 **No Sign-In Required**: Submit search results immediately without authentication
 - 📝 **Anonymous Submissions**: All submissions are anonymous (no user attribution)
 - 🎯 **Auto-Capture**: Automatically extract search data from ChatGPT, Claude, Gemini, and DeepSeek
+- 🌐 **Claude Auto-Publish**: One-click publishing of Claude conversations with automatic public link capture
 - ⚡ **Quick & Simple**: Minimal setup, instant usage
 
 ## Installation
@@ -23,8 +24,21 @@ This is the **simple, anonymous version** of the LLM Archive Chrome extension th
    - Navigate to a ChatGPT, Claude, Gemini, or DeepSeek conversation
    - Click the extension icon
    - Use "Auto-Capture" to automatically fill the form, or fill manually
+   - **For Claude.ai**: Check "Post and Share to Anyone on Internet" to automatically publish the conversation and capture the public share link
    - Submit to the archive (no sign-in needed)
 3. **Browse Archive**: Visit the main web application to search and discover results
+
+### Claude.ai Auto-Publish Feature
+
+When you're on a Claude.ai conversation:
+1. Check the "Post and Share to Anyone on Internet" checkbox
+2. The extension will automatically:
+   - Click the "Publish" button
+   - Select "Publish and Copy link" in the dialog
+   - Capture the public share link
+   - Fill it into the "Public Share Link" field
+
+This makes it easy to share Claude conversations publicly without manual copying and pasting!
 
 ## Important Notes
 

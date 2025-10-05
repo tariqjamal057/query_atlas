@@ -30,11 +30,13 @@ Preferred communication style: Simple, everyday language.
 - **Architecture**: Manifest V3 extension with background service worker, content scripts, and popup interface
 - **Platform Support**: Automated detection and data extraction from ChatGPT, Claude, Gemini, and DeepSeek
 - **Communication**: Extension communicates with the web application via REST API endpoints
+- **Claude Auto-Publish**: Automated conversation publishing feature that clicks the publish button, selects "Publish and Copy link", and captures the public share link automatically
 
 ## Key Features
 - **Search and Discovery**: Full-text search capabilities for finding similar search results
 - **Engagement Tracking**: View and save counters for measuring content popularity
 - **Platform Integration**: Support for multiple LLM platforms with platform-specific extractors
+- **Claude Auto-Publish**: One-click automation to publish Claude.ai conversations and automatically capture public share links
 - **Responsive Design**: Mobile-first design with adaptive layouts using Tailwind CSS
 
 # External Dependencies

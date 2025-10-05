@@ -18,6 +18,7 @@ This project provides **two versions** of the Chrome extension to suit different
 - Spam/DDOS protection
 - Works with HTTPS production domains
 - Enterprise-ready security
+- **Claude.ai Auto-Publish**: Automatically publish conversations and capture public share links
 
 📁 **Location:** `chrome-extension-auth/`
 📖 **Documentation:** [chrome-extension-auth/README.md](chrome-extension-auth/README.md)
@@ -37,6 +38,7 @@ This project provides **two versions** of the Chrome extension to suit different
 - Anonymous submissions
 - Instant usage
 - Simplified interface
+- **Claude.ai Auto-Publish**: Automatically publish conversations and capture public share links
 
 📁 **Location:** `chrome-extension-anonymous/`
 📖 **Documentation:** [chrome-extension-anonymous/README.md](chrome-extension-anonymous/README.md)
