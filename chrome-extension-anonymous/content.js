@@ -255,6 +255,159 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     return true;
   }
+  
+  if (request.action === 'publishClaude') {
+    (async () => {
+      try {
+        console.log('Starting Claude publish automation...');
+        
+        // Check if we're on Claude.ai
+        if (!window.location.hostname.includes('claude.ai')) {
+          sendResponse({
+            success: false,
+            error: 'Not on Claude.ai'
+          });
+          return;
+        }
+        
+        // Find the Publish button - try multiple selectors
+        const publishButtonSelectors = [
+          'button[aria-label*="Publish"]',
+          'button:has-text("Publish")',
+          'button[title*="Publish"]',
+          '[data-testid*="publish"]',
+          'button:contains("Publish")'
+        ];
+        
+        let publishButton = null;
+        for (const selector of publishButtonSelectors) {
+          try {
+            publishButton = document.querySelector(selector);
+            if (publishButton) break;
+          } catch (e) {
+            // Selector might not be valid, continue
+          }
+        }
+        
+        // Fallback: search all buttons for one containing "Publish"
+        if (!publishButton) {
+          const allButtons = document.querySelectorAll('button');
+          for (const btn of allButtons) {
+            const text = btn.textContent || btn.innerText || '';
+            if (text.toLowerCase().includes('publish')) {
+              publishButton = btn;
+              break;
+            }
+          }
+        }
+        
+        if (!publishButton) {
+          sendResponse({
+            success: false,
+            error: 'Could not find Publish button. Make sure you have a conversation open.'
+          });
+          return;
+        }
+        
+        console.log('Found publish button, clicking...');
+        publishButton.click();
+        
+        // Wait for the publish dialog to appear
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Find "Publish and Copy link" button in the dialog
+        let publishAndCopyButton = null;
+        
+        // Try to find the button with various selectors
+        const copyLinkSelectors = [
+          'button:has-text("Publish and Copy link")',
+          'button[aria-label*="Copy"]',
+          'button:contains("Copy link")',
+          '[data-testid*="copy-link"]'
+        ];
+        
+        for (const selector of copyLinkSelectors) {
+          try {
+            publishAndCopyButton = document.querySelector(selector);
+            if (publishAndCopyButton) break;
+          } catch (e) {
+            // Continue
+          }
+        }
+        
+        // Fallback: search all buttons for one containing "Copy" or "link"
+        if (!publishAndCopyButton) {
+          const allButtons = document.querySelectorAll('button');
+          for (const btn of allButtons) {
+            const text = (btn.textContent || btn.innerText || '').toLowerCase();
+            if (text.includes('copy') && text.includes('link')) {
+              publishAndCopyButton = btn;
+              break;
+            }
+          }
+        }
+        
+        if (!publishAndCopyButton) {
+          sendResponse({
+            success: false,
+            error: 'Publish dialog opened but could not find "Publish and Copy link" button. Please publish manually.'
+          });
+          return;
+        }
+        
+        console.log('Found "Publish and Copy link" button, clicking...');
+        publishAndCopyButton.click();
+        
+        // Wait for link to be copied
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Try to get the link from clipboard
+        try {
+          const clipboardText = await navigator.clipboard.readText();
+          console.log('Got clipboard text:', clipboardText);
+          
+          if (clipboardText && clipboardText.includes('claude.ai')) {
+            sendResponse({
+              success: true,
+              publicLink: clipboardText
+            });
+          } else {
+            // Fallback: try to extract from the current page
+            const linkInputs = document.querySelectorAll('input[type="text"], input[type="url"]');
+            for (const input of linkInputs) {
+              if (input.value && input.value.includes('claude.ai/share')) {
+                sendResponse({
+                  success: true,
+                  publicLink: input.value
+                });
+                return;
+              }
+            }
+            
+            sendResponse({
+              success: false,
+              error: 'Link was copied but could not be read from clipboard. Please paste the link manually.'
+            });
+          }
+        } catch (clipboardError) {
+          console.error('Clipboard read error:', clipboardError);
+          sendResponse({
+            success: false,
+            error: 'Link was copied but browser blocked clipboard access. Please paste the link manually (Ctrl+V or Cmd+V).'
+          });
+        }
+        
+      } catch (error) {
+        console.error('Claude publish error:', error);
+        sendResponse({
+          success: false,
+          error: `Failed to publish: ${error.message}`
+        });
+      }
+    })();
+    
+    return true; // Keep message channel open for async response
+  }
 });
 
 // Auto-detect new conversations and offer to capture

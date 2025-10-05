@@ -22,6 +22,7 @@ let API_BASE = '';
 const statusDiv = document.getElementById('status');
 const mainSection = document.getElementById('main-section');
 const queryInput = document.getElementById('query');
+const autoShareCheckbox = document.getElementById('autoShare');
 const publicLinkInput = document.getElementById('publicLink');
 const platformSelect = document.getElementById('platform');
 const descriptionInput = document.getElementById('description');
@@ -278,6 +279,52 @@ submitBtn?.addEventListener('click', async () => {
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Submit to Archive';
+  }
+});
+
+// Auto-share checkbox handler
+autoShareCheckbox?.addEventListener('change', async () => {
+  if (!autoShareCheckbox.checked) return;
+  
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = new URL(tab.url);
+    
+    // Check if this is Claude
+    if (!url.hostname.includes('claude.ai')) {
+      showStatus('Auto-share is only available for Claude.ai', 'error');
+      autoShareCheckbox.checked = false;
+      return;
+    }
+    
+    showStatus('Triggering Claude publish...', 'info');
+    
+    // Try to inject content script first
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (e) {
+      console.log('Content script already loaded');
+    }
+    
+    // Send message to content script to publish
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'publishClaude' });
+    
+    if (response && response.success) {
+      publicLinkInput.value = response.publicLink;
+      showStatus('Public share link captured!', 'success');
+    } else {
+      showStatus(response?.error || 'Failed to publish conversation', 'error');
+      autoShareCheckbox.checked = false;
+    }
+    
+  } catch (error) {
+    console.error('Auto-share error:', error);
+    showStatus(`Failed to auto-share: ${error.message}`, 'error');
+    autoShareCheckbox.checked = false;
   }
 });
 
