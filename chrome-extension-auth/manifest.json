@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LLM Archive (Authenticated)", 
+  "name": "LLM Archive (Authenticated)",
   "version": "1.0.0",
   "description": "Secure extension requiring Google sign-in to save AI search results from popular LLM platforms",
   "permissions": [
@@ -11,7 +11,8 @@
     "notifications",
     "scripting",
     "alarms",
-    "management"
+    "management",
+    "identity"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -45,5 +46,14 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["oauth-callback.html", "oauth-callback.js", "oauth-callback.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
   }
 }
