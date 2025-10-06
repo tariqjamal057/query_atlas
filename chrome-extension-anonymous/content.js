@@ -575,19 +575,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Helper function to find ChatGPT Share button
 async function findChatGPTShareButton() {
+  // Try valid CSS selectors first
   const selectors = [
     'button[data-testid="share-button"]',
     'button[aria-label*="Share"]',
-    'button[title*="Share"]',
-    'header button:has(svg[data-icon="share"])',
-    'button:has(svg):has-text("Share")'
+    'button[title*="Share"]'
   ];
   
   for (const selector of selectors) {
-    const btn = document.querySelector(selector);
-    if (btn) {
-      console.log('[ChatGPT Publish] Found Share button with selector:', selector);
-      return btn;
+    try {
+      const btn = document.querySelector(selector);
+      if (btn) {
+        console.log('[ChatGPT Publish] Found Share button with selector:', selector);
+        return btn;
+      }
+    } catch (e) {
+      console.log('[ChatGPT Publish] Invalid selector:', selector);
     }
   }
   
@@ -607,28 +610,35 @@ async function findChatGPTShareButton() {
 
 // Helper function to find ChatGPT Create/Update link button
 async function findChatGPTCreateLinkButton() {
+  // Try valid CSS selectors first (aria-label attributes)
   const selectors = [
-    'button:has-text("Create link")',
-    'button:has-text("Update link")',
-    'button:has-text("Copy link")',
     'button[aria-label*="Create link"]',
     'button[aria-label*="Update link"]',
     'button[aria-label*="Copy link"]'
   ];
   
   for (const selector of selectors) {
-    const btn = document.querySelector(selector);
-    if (btn) {
-      console.log('[ChatGPT Publish] Found Create/Update button with selector:', selector);
-      return btn;
+    try {
+      const btn = document.querySelector(selector);
+      if (btn) {
+        console.log('[ChatGPT Publish] Found Create/Update button with selector:', selector);
+        return btn;
+      }
+    } catch (e) {
+      console.log('[ChatGPT Publish] Invalid selector:', selector);
     }
   }
   
-  // Text-based search in all buttons
+  // Text-based search in all buttons (case-insensitive partial match)
   const allButtons = document.querySelectorAll('button');
   for (const btn of allButtons) {
-    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
-    if (text === 'create link' || text === 'update link' || text === 'copy link') {
+    const text = (btn.textContent || btn.innerText || '').trim();
+    const lowerText = text.toLowerCase();
+    
+    // Match "Create link", "Create Link", "Update link", "Update Link", "Copy link", etc.
+    if (lowerText.includes('create link') || 
+        lowerText.includes('update link') || 
+        lowerText.includes('copy link')) {
       console.log('[ChatGPT Publish] Found Create/Update button by text:', text);
       return btn;
     }
