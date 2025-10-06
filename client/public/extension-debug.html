@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Extension Debug - LLM Archive</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f9fafb;
+    }
+    
+    .container {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .extension-popup {
+      width: 350px;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .debug-panel {
+      flex: 1;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: #2563eb;
+      border-radius: 6px;
+      margin-right: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    
+    h2 {
+      font-size: 16px;
+      margin-top: 0;
+      color: #1f2937;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    
+    .status.success {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    
+    .status.error {
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+    
+    .status.info {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #dbeafe;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    
+    input, textarea, select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    button {
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    
+    button:hover {
+      background: #1d4ed8;
+    }
+    
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    
+    .console-log {
+      background: #1f2937;
+      color: #10b981;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    
+    .console-log div {
+      margin-bottom: 4px;
+    }
+    
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #dbeafe;
+      color: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align: center; margin-bottom: 10px;">Extension Debug Simulator</h1>
+  <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">Test the auto-capture checkbox functionality</p>
+
+  <div class="container">
+    <div class="extension-popup">
+      <div class="header">
+        <div class="logo">
+          <svg viewBox="0 0 20 20" fill="white" width="20" height="20">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>LLM Archive</h1>
+          <div style="font-size: 12px; color: #2563eb; font-weight: 500;">Debug Mode</div>
+        </div>
+      </div>
+
+      <div id="status" class="status info" style="display: none;"></div>
+
+      <div class="form-group">
+        <label for="query">Search Query</label>
+        <input type="text" id="query" placeholder="What did you search for?">
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="autoShare" style="width: auto;">
+          <span>Post and Share to Anyone on Internet <span class="badge">Claude only</span></span>
+        </label>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+          Automatically publish Claude conversation and capture share link
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="publicLink">Public Share Link</label>
+        <input type="url" id="publicLink" placeholder="https://claude.ai/share/...">
+      </div>
+
+      <div class="form-group">
+        <label for="platform">Platform</label>
+        <select id="platform">
+          <option value="">Detect automatically</option>
+          <option value="ChatGPT">ChatGPT</option>
+          <option value="Claude">Claude</option>
+          <option value="Gemini">Gemini</option>
+          <option value="DeepSeek">DeepSeek</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description (optional)</label>
+        <textarea id="description" placeholder="Brief description..."></textarea>
+      </div>
+
+      <button id="submit-btn">Submit to Archive</button>
+    </div>
+
+    <div class="debug-panel">
+      <h2>Debug Console</h2>
+      <p style="color: #6b7280; font-size: 14px; margin-top: 0;">
+        This simulates the extension environment. Check the auto-share checkbox to see what happens.
+      </p>
+      
+      <div class="form-group">
+        <label>Simulate Page URL</label>
+        <input type="text" id="mockUrl" value="https://claude.ai/chat/12345" placeholder="https://claude.ai/chat/...">
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+          Change this to test different domains (claude.ai, chatgpt.com, etc.)
+        </div>
+      </div>
+
+      <div class="console-log" id="console"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusDiv = document.getElementById('status');
+    const queryInput = document.getElementById('query');
+    const autoShareCheckbox = document.getElementById('autoShare');
+    const publicLinkInput = document.getElementById('publicLink');
+    const platformSelect = document.getElementById('platform');
+    const descriptionInput = document.getElementById('description');
+    const submitBtn = document.getElementById('submit-btn');
+    const consoleDiv = document.getElementById('console');
+    const mockUrlInput = document.getElementById('mockUrl');
+
+    // Console logging
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const color = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#60a5fa';
+      consoleDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    function showStatus(message, type) {
+      statusDiv.textContent = message;
+      statusDiv.className = `status ${type}`;
+      statusDiv.style.display = 'block';
+      
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    // Auto-share checkbox handler (simulating extension behavior)
+    autoShareCheckbox.addEventListener('change', async () => {
+      if (!autoShareCheckbox.checked) return;
+      
+      try {
+        const currentUrl = mockUrlInput.value;
+        const url = new URL(currentUrl);
+        
+        log('Auto-share checkbox triggered', 'info');
+        log(`Current URL: ${currentUrl}`, 'info');
+        
+        // Check if this is Claude
+        if (!url.hostname.includes('claude.ai')) {
+          showStatus('Auto-share is only available for Claude.ai', 'error');
+          log('ERROR: Not on Claude.ai domain', 'error');
+          autoShareCheckbox.checked = false;
+          return;
+        }
+        
+        log('Detected Claude.ai domain ✓', 'success');
+        showStatus('Triggering Claude publish...', 'info');
+        log('Simulating: Click Share button...', 'info');
+        
+        // Simulate the automation steps
+        await simulateClaudePublish();
+        
+      } catch (error) {
+        log(`ERROR: ${error.message}`, 'error');
+        showStatus(`Failed to auto-share: ${error.message}`, 'error');
+        autoShareCheckbox.checked = false;
+      }
+    });
+
+    async function simulateClaudePublish() {
+      // Simulate finding Share button
+      await sleep(500);
+      log('Searching for Share button...', 'info');
+      log('  - Trying: button[data-testid="share-menu-trigger"]', 'info');
+      
+      await sleep(300);
+      log('✓ Found Share button with selector: button[data-testid="share-menu-trigger"]', 'success');
+      log('Clicking Share button...', 'info');
+      
+      // Simulate dialog opening
+      await sleep(800);
+      log('Waiting for share dialog...', 'info');
+      
+      await sleep(500);
+      log('Searching for Public Access option...', 'info');
+      log('  - Trying: div[role="menuitem"]', 'info');
+      
+      await sleep(300);
+      log('✓ Found Public Access with text: "Anyone with the link"', 'success');
+      log('Clicking Public Access option...', 'info');
+      
+      // Simulate copy button
+      await sleep(500);
+      log('Searching for Copy link button...', 'info');
+      log('  - Trying: button[data-testid="copy-share-link"]', 'info');
+      
+      await sleep(300);
+      log('✓ Found Copy button with selector: button[data-testid="copy-share-link"]', 'success');
+      log('Clicking Copy link button...', 'info');
+      
+      // Simulate clipboard read
+      await sleep(500);
+      log('Attempting to read clipboard...', 'info');
+      
+      const mockLink = `https://claude.ai/share/${Math.random().toString(36).substr(2, 9)}`;
+      log(`✓ Clipboard content: ${mockLink}`, 'success');
+      
+      // Fill the link
+      publicLinkInput.value = mockLink;
+      showStatus('Public share link captured!', 'success');
+      log('SUCCESS: Link populated in form field', 'success');
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Submit button handler
+    submitBtn.addEventListener('click', async () => {
+      if (!queryInput.value.trim()) {
+        showStatus('Please enter a search query', 'error');
+        return;
+      }
+
+      if (!publicLinkInput.value.trim()) {
+        showStatus('Please enter a public share link', 'error');
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        
+        log('Submitting to API...', 'info');
+        
+        const response = await fetch('/api/search-results/anonymous', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryInput.value,
+            publicLink: publicLinkInput.value,
+            description: descriptionInput.value || null,
+            platform: platformSelect.value || 'Claude'
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          log(`✓ Submission successful! ID: ${result.id}`, 'success');
+          showStatus('Successfully submitted to archive!', 'success');
+          
+          // Clear form
+          queryInput.value = '';
+          publicLinkInput.value = '';
+          descriptionInput.value = '';
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (error) {
+        log(`ERROR: Failed to submit - ${error.message}`, 'error');
+        showStatus('Submission failed', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit to Archive';
+      }
+    });
+
+    // Initial log
+    log('Extension Debug Simulator loaded', 'success');
+    log('Ready to test auto-capture functionality', 'info');
+  </script>
+</body>
+</html>
