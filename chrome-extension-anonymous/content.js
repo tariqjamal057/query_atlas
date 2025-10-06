@@ -415,7 +415,201 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     return true; // Keep message channel open for async response
   }
+  
+  if (request.action === 'publishChatGPT') {
+    (async () => {
+      try {
+        console.log('[ChatGPT Publish] Starting automation...');
+        
+        // Check if we're on ChatGPT
+        if (!window.location.hostname.includes('chatgpt.com')) {
+          sendResponse({
+            success: false,
+            error: 'Not on ChatGPT. This feature only works on ChatGPT conversations.'
+          });
+          return;
+        }
+        
+        // Step 1: Find and click the Share button
+        console.log('[ChatGPT Publish] Step 1: Finding Share button...');
+        const shareButton = await findChatGPTShareButton();
+        
+        if (!shareButton) {
+          sendResponse({
+            success: false,
+            error: 'Could not find Share button. Make sure you have a conversation started.'
+          });
+          return;
+        }
+        
+        console.log('[ChatGPT Publish] Found Share button, clicking...');
+        shareButton.click();
+        
+        // Step 2: Wait for dialog to appear
+        console.log('[ChatGPT Publish] Step 2: Waiting for share dialog...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Step 3: Find and click "Create link" or "Update link" button
+        console.log('[ChatGPT Publish] Step 3: Finding Create/Update link button...');
+        const createLinkButton = await findChatGPTCreateLinkButton();
+        
+        if (!createLinkButton) {
+          sendResponse({
+            success: false,
+            error: 'Share dialog opened but could not find "Create link" or "Update link" button.'
+          });
+          return;
+        }
+        
+        console.log('[ChatGPT Publish] Found Create/Update button, clicking...');
+        
+        // Focus window before clicking
+        window.focus();
+        document.body.focus();
+        
+        createLinkButton.click();
+        
+        // Step 4: Wait for link to be created and copied
+        console.log('[ChatGPT Publish] Step 4: Waiting for link creation...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Step 5: Try to read clipboard
+        console.log('[ChatGPT Publish] Step 5: Attempting to get share link...');
+        let publicLink = null;
+        
+        // Method 1: Try clipboard read (multiple attempts)
+        for (let attempt = 1; attempt <= 3 && !publicLink; attempt++) {
+          try {
+            console.log(`[ChatGPT Publish] Clipboard read attempt ${attempt}/3...`);
+            const clipboardText = await navigator.clipboard.readText();
+            console.log('[ChatGPT Publish] Clipboard content:', clipboardText?.substring(0, 100));
+            
+            if (clipboardText && clipboardText.includes('chatgpt.com')) {
+              publicLink = clipboardText.trim();
+              console.log('[ChatGPT Publish] ✓ Got link from clipboard');
+              break;
+            }
+          } catch (clipboardError) {
+            console.warn(`[ChatGPT Publish] Clipboard read attempt ${attempt} failed:`, clipboardError.message);
+            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        // Method 2: Search for input fields with the share link
+        if (!publicLink) {
+          console.log('[ChatGPT Publish] Method 2: Searching input fields...');
+          const linkInputs = document.querySelectorAll('input[type="text"], input[type="url"], input[readonly], input[value*="chatgpt.com"]');
+          for (const input of linkInputs) {
+            const value = input.value || input.getAttribute('value') || '';
+            if (value && (value.includes('chatgpt.com/share') || value.includes('chatgpt.com/c/'))) {
+              publicLink = value;
+              console.log('[ChatGPT Publish] ✓ Found share link in input:', publicLink.substring(0, 50));
+              break;
+            }
+          }
+        }
+        
+        // Method 3: Look for text elements with share links
+        if (!publicLink) {
+          console.log('[ChatGPT Publish] Method 3: Searching text elements...');
+          const allText = document.body.innerText;
+          const shareMatch = allText.match(/https:\/\/chatgpt\.com\/share\/[a-zA-Z0-9-]+/) || 
+                            allText.match(/https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+/);
+          if (shareMatch) {
+            publicLink = shareMatch[0];
+            console.log('[ChatGPT Publish] ✓ Found share link in page text');
+          }
+        }
+        
+        // Final check
+        if (publicLink) {
+          sendResponse({
+            success: true,
+            publicLink: publicLink
+          });
+        } else {
+          sendResponse({
+            success: false,
+            error: 'Share link created but could not capture it automatically. Please copy the link manually.'
+          });
+        }
+        
+      } catch (error) {
+        console.error('[ChatGPT Publish] Error:', error);
+        sendResponse({
+          success: false,
+          error: `Automation failed: ${error.message}. Please try sharing manually.`
+        });
+      }
+    })();
+    
+    return true; // Keep message channel open for async response
+  }
 });
+
+// Helper function to find ChatGPT Share button
+async function findChatGPTShareButton() {
+  const selectors = [
+    'button[data-testid="share-button"]',
+    'button[aria-label*="Share"]',
+    'button[title*="Share"]',
+    'header button:has(svg[data-icon="share"])',
+    'button:has(svg):has-text("Share")'
+  ];
+  
+  for (const selector of selectors) {
+    const btn = document.querySelector(selector);
+    if (btn) {
+      console.log('[ChatGPT Publish] Found Share button with selector:', selector);
+      return btn;
+    }
+  }
+  
+  // Text-based search
+  const allButtons = document.querySelectorAll('button');
+  for (const btn of allButtons) {
+    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+    const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+    if (text.includes('share') || ariaLabel.includes('share')) {
+      console.log('[ChatGPT Publish] Found Share button by text/aria-label');
+      return btn;
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to find ChatGPT Create/Update link button
+async function findChatGPTCreateLinkButton() {
+  const selectors = [
+    'button:has-text("Create link")',
+    'button:has-text("Update link")',
+    'button:has-text("Copy link")',
+    'button[aria-label*="Create link"]',
+    'button[aria-label*="Update link"]',
+    'button[aria-label*="Copy link"]'
+  ];
+  
+  for (const selector of selectors) {
+    const btn = document.querySelector(selector);
+    if (btn) {
+      console.log('[ChatGPT Publish] Found Create/Update button with selector:', selector);
+      return btn;
+    }
+  }
+  
+  // Text-based search in all buttons
+  const allButtons = document.querySelectorAll('button');
+  for (const btn of allButtons) {
+    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+    if (text === 'create link' || text === 'update link' || text === 'copy link') {
+      console.log('[ChatGPT Publish] Found Create/Update button by text:', text);
+      return btn;
+    }
+  }
+  
+  return null;
+}
 
 // Helper function to find Publish/Share button with multiple strategies
 async function findPublishButton() {

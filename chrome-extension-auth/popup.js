@@ -419,14 +419,23 @@ autoShareCheckbox.addEventListener('change', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = new URL(tab.url);
     
-    // Check if this is Claude
-    if (!url.hostname.includes('claude.ai')) {
-      showStatus('Auto-share is only available for Claude.ai', 'error');
+    // Detect platform and determine action
+    let publishAction = null;
+    let platformName = '';
+    
+    if (url.hostname.includes('claude.ai')) {
+      publishAction = 'publishClaude';
+      platformName = 'Claude';
+    } else if (url.hostname.includes('chatgpt.com')) {
+      publishAction = 'publishChatGPT';
+      platformName = 'ChatGPT';
+    } else {
+      showStatus('Auto-share is only available for Claude.ai and ChatGPT', 'error');
       autoShareCheckbox.checked = false;
       return;
     }
     
-    showStatus('Triggering Claude publish...', 'info');
+    showStatus(`Triggering ${platformName} publish...`, 'info');
     
     // IMPORTANT: Ensure the tab is focused for clipboard access
     await chrome.tabs.update(tab.id, { active: true });
@@ -447,7 +456,7 @@ autoShareCheckbox.addEventListener('change', async () => {
     }
     
     // Send message to content script to publish
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'publishClaude' });
+    const response = await chrome.tabs.sendMessage(tab.id, { action: publishAction });
     
     if (response && response.success) {
       publicLinkInput.value = response.publicLink;

@@ -197,10 +197,10 @@
       <div class="form-group">
         <label class="checkbox-label">
           <input type="checkbox" id="autoShare" style="width: auto;">
-          <span>Post and Share to Anyone on Internet <span class="badge">Claude only</span></span>
+          <span>Post and Share to Anyone on Internet</span>
         </label>
         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-          Automatically publish Claude conversation and capture share link
+          Automatically publish conversation and capture share link (Claude & ChatGPT)
         </div>
       </div>
 
@@ -239,7 +239,7 @@
         <label>Simulate Page URL</label>
         <input type="text" id="mockUrl" value="https://claude.ai/chat/12345" placeholder="https://claude.ai/chat/...">
         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-          Change this to test different domains (claude.ai, chatgpt.com, etc.)
+          Try: https://claude.ai/chat/12345 or https://chatgpt.com/c/12345
         </div>
       </div>
 
@@ -287,20 +287,21 @@
         log('Auto-share checkbox triggered', 'info');
         log(`Current URL: ${currentUrl}`, 'info');
         
-        // Check if this is Claude
-        if (!url.hostname.includes('claude.ai')) {
-          showStatus('Auto-share is only available for Claude.ai', 'error');
-          log('ERROR: Not on Claude.ai domain', 'error');
+        // Detect platform
+        if (url.hostname.includes('claude.ai')) {
+          log('Detected Claude.ai domain ✓', 'success');
+          showStatus('Triggering Claude publish...', 'info');
+          await simulateClaudePublish();
+        } else if (url.hostname.includes('chatgpt.com')) {
+          log('Detected ChatGPT domain ✓', 'success');
+          showStatus('Triggering ChatGPT publish...', 'info');
+          await simulateChatGPTPublish();
+        } else {
+          showStatus('Auto-share is only available for Claude.ai and ChatGPT', 'error');
+          log('ERROR: Not on supported domain', 'error');
           autoShareCheckbox.checked = false;
           return;
         }
-        
-        log('Detected Claude.ai domain ✓', 'success');
-        showStatus('Triggering Claude publish...', 'info');
-        log('Simulating: Click Share button...', 'info');
-        
-        // Simulate the automation steps
-        await simulateClaudePublish();
         
       } catch (error) {
         log(`ERROR: ${error.message}`, 'error');
@@ -345,6 +346,44 @@
       log('Attempting to read clipboard...', 'info');
       
       const mockLink = `https://claude.ai/share/${Math.random().toString(36).substr(2, 9)}`;
+      log(`✓ Clipboard content: ${mockLink}`, 'success');
+      
+      // Fill the link
+      publicLinkInput.value = mockLink;
+      showStatus('Public share link captured!', 'success');
+      log('SUCCESS: Link populated in form field', 'success');
+    }
+
+    async function simulateChatGPTPublish() {
+      // Simulate finding Share button
+      await sleep(500);
+      log('Searching for Share button...', 'info');
+      log('  - Trying: button[data-testid="share-button"]', 'info');
+      
+      await sleep(300);
+      log('✓ Found Share button with selector: button[data-testid="share-button"]', 'success');
+      log('Clicking Share button...', 'info');
+      
+      // Simulate dialog opening
+      await sleep(800);
+      log('Waiting for share dialog...', 'info');
+      
+      await sleep(500);
+      log('Searching for Create/Update link button...', 'info');
+      log('  - Trying: button containing "Create link"', 'info');
+      
+      await sleep(300);
+      log('✓ Found Create link button', 'success');
+      log('Clicking Create link button...', 'info');
+      
+      // Simulate link creation
+      await sleep(800);
+      log('Waiting for link creation...', 'info');
+      
+      await sleep(500);
+      log('Attempting to read clipboard...', 'info');
+      
+      const mockLink = `https://chatgpt.com/share/${Math.random().toString(36).substr(2, 9)}`;
       log(`✓ Clipboard content: ${mockLink}`, 'success');
       
       // Fill the link
