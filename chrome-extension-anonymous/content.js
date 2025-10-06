@@ -316,6 +316,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         
         console.log('[Claude Publish] Found Copy link button, clicking...');
+        
+        // IMPORTANT: Focus the window first to enable clipboard access
+        window.focus();
+        document.body.focus();
+        
         copyLinkButton.click();
         
         // Step 4: Wait longer for clipboard operation to complete

@@ -428,6 +428,13 @@ autoShareCheckbox.addEventListener('change', async () => {
     
     showStatus('Triggering Claude publish...', 'info');
     
+    // IMPORTANT: Ensure the tab is focused for clipboard access
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    
+    // Wait a moment for focus to take effect
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     // Try to inject content script first
     try {
       await chrome.scripting.executeScript({
