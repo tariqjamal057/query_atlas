@@ -277,7 +277,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (!publishButton) {
           sendResponse({
             success: false,
-            error: 'Could not find Share button. Make sure you have a conversation open and it\'s not already published.'
+            error: 'Claude.ai does not have a native share button for free users. Please manually copy the conversation URL, or use Claude Projects (Team/Enterprise only) for sharing. As an alternative, you can paste the conversation URL in the Public Share Link field.'
           });
           return;
         }
@@ -380,8 +380,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Helper function to find Publish/Share button with multiple strategies
 async function findPublishButton() {
-  // Strategy 1: Common selectors (updated for new "Share" button)
+  // Strategy 1: Modern Claude selectors (2025)
   const selectors = [
+    'button[data-testid="share-menu-trigger"]',
+    'header button[aria-label*="Share"]',
     'button[aria-label*="Share"]',
     'button[title*="Share"]',
     'button[aria-label*="Publish"]', // Backward compatibility
@@ -393,14 +395,28 @@ async function findPublishButton() {
   
   for (const selector of selectors) {
     const btn = document.querySelector(selector);
-    if (btn) return btn;
+    if (btn) {
+      console.log('[Claude Publish] Found Share button with selector:', selector);
+      return btn;
+    }
   }
   
-  // Strategy 2: Text-based search (updated for "Share")
+  // Strategy 2: Text-based search in header buttons first
+  const headerButtons = document.querySelectorAll('header button');
+  for (const btn of headerButtons) {
+    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+    if (text === 'share' || text.includes('share')) {
+      console.log('[Claude Publish] Found Share button by header text');
+      return btn;
+    }
+  }
+  
+  // Strategy 3: All buttons text search
   const allButtons = document.querySelectorAll('button');
   for (const btn of allButtons) {
     const text = (btn.textContent || btn.innerText || '').toLowerCase();
     if (text.includes('share') || text.includes('publish') || text.includes('post to')) {
+      console.log('[Claude Publish] Found Share button by general text search');
       return btn;
     }
   }
@@ -410,8 +426,11 @@ async function findPublishButton() {
 
 // Helper function to find Public Access button
 async function findPublicAccessButton() {
-  // Strategy 1: Common selectors
+  // Strategy 1: Modern Claude selectors for menu items (2025)
   const selectors = [
+    'label:has(input[value="public"])',
+    'div[role="menuitem"]',
+    'div[role="option"]',
     'button[aria-label*="Public"]',
     'button[title*="Public"]',
     'button[aria-label*="Public Access"]',
@@ -419,16 +438,22 @@ async function findPublicAccessButton() {
   ];
   
   for (const selector of selectors) {
-    const btn = document.querySelector(selector);
-    if (btn) return btn;
+    const elements = document.querySelectorAll(selector);
+    for (const el of elements) {
+      const text = (el.textContent || el.innerText || '').toLowerCase().trim();
+      if (text.includes('anyone with the link') || text.includes('public') || text.includes('anyone on internet')) {
+        console.log('[Claude Publish] Found Public Access with selector:', selector, 'text:', text);
+        return el;
+      }
+    }
   }
   
-  // Strategy 2: Text-based search
-  const allButtons = document.querySelectorAll('button, div[role="button"], div[role="option"]');
-  for (const btn of allButtons) {
-    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
-    if (text === 'public' || text === 'public access' || text.includes('anyone on internet')) {
-      return btn;
+  // Strategy 2: Look for radio/checkbox inputs with public value
+  const inputs = document.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+  for (const input of inputs) {
+    if (input.value === 'public' || input.id?.includes('public')) {
+      console.log('[Claude Publish] Found Public Access input');
+      return input.parentElement;
     }
   }
   
@@ -437,24 +462,30 @@ async function findPublicAccessButton() {
 
 // Helper function to find Copy Link button
 async function findCopyLinkButton() {
-  // Strategy 1: Common selectors
+  // Strategy 1: Modern Claude selectors (2025)
   const selectors = [
+    'button[data-testid="copy-share-link"]',
     'button[aria-label*="Copy link"]',
     'button[aria-label*="Copy"]',
     'button[title*="Copy link"]',
-    '[data-testid*="copy-link"]'
+    '[data-testid*="copy-link"]',
+    'button:has(svg[aria-label*="Copy"])'
   ];
   
   for (const selector of selectors) {
     const btn = document.querySelector(selector);
-    if (btn) return btn;
+    if (btn) {
+      console.log('[Claude Publish] Found Copy button with selector:', selector);
+      return btn;
+    }
   }
   
-  // Strategy 2: Text-based search in visible buttons
+  // Strategy 2: Text-based search in visible buttons (check nested spans too)
   const allButtons = document.querySelectorAll('button');
   for (const btn of allButtons) {
-    const text = (btn.textContent || btn.innerText || '').toLowerCase();
-    if ((text.includes('copy') && text.includes('link')) || text.includes('publish and copy') || text === 'copy link') {
+    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+    if (text === 'copy link' || text === 'copy' || (text.includes('copy') && text.includes('link')) || text.includes('publish and copy')) {
+      console.log('[Claude Publish] Found Copy button by text:', text);
       return btn;
     }
   }

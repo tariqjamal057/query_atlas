@@ -30,15 +30,22 @@ This is the **secure, authenticated version** of the LLM Archive Chrome extensio
 
 ### Claude.ai Auto-Publish Feature
 
-When you're on a Claude.ai conversation:
+**⚠️ Important Limitation**: As of 2025, Claude.ai does not have a native share button for free users. The auto-publish feature only works for:
+- **Team/Enterprise users** with Claude Projects enabled
+- Users who have third-party sharing extensions installed
+
+**For most users**: 
+1. The auto-publish feature will show an error message
+2. You'll need to manually copy the conversation URL from your browser's address bar
+3. Paste the URL into the "Public Share Link" field in the extension
+
+**If you have Claude Projects (Team/Enterprise)**:
 1. Check the "Post and Share to Anyone on Internet" checkbox
-2. The extension will automatically:
+2. The extension will attempt to:
    - Click the "Share" button
    - Select the copy link option in the dialog
    - Capture the public share link
    - Fill it into the "Public Share Link" field
-
-This makes it easy to share Claude conversations publicly without manual copying and pasting!
 
 ## Security
 

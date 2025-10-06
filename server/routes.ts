@@ -372,7 +372,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Download Chrome extension as ZIP
   app.get("/api/download-extension", async (req, res) => {
     try {
-      const extensionDir = path.join(process.cwd(), "chrome-extension");
+      const extensionType = req.query.type === 'anonymous' ? 'chrome-extension-anonymous' : 'chrome-extension-auth';
+      const extensionDir = path.join(process.cwd(), extensionType);
       
       // Check if extension directory exists
       if (!fs.existsSync(extensionDir)) {
@@ -381,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set response headers for ZIP download
       res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', 'attachment; filename="llm-archive-extension.zip"');
+      res.setHeader('Content-Disposition', `attachment; filename="llm-archive-extension-${extensionType === 'chrome-extension-auth' ? 'auth' : 'anonymous'}.zip"`);
 
       // Create ZIP archive
       const archive = archiver('zip', {
