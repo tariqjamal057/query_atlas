@@ -318,36 +318,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('[Claude Publish] Found Copy link button, clicking...');
         copyLinkButton.click();
         
-        // Step 4: Wait for clipboard operation to complete
+        // Step 4: Wait longer for clipboard operation to complete
         console.log('[Claude Publish] Step 4: Waiting for clipboard...');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Step 5: Attempt to read clipboard
-        console.log('[Claude Publish] Step 5: Reading clipboard...');
+        // Step 5: Try multiple methods to get the link
+        console.log('[Claude Publish] Step 5: Attempting to get share link...');
         let publicLink = null;
         
-        try {
-          const clipboardText = await navigator.clipboard.readText();
-          console.log('[Claude Publish] Clipboard content:', clipboardText);
-          
-          if (clipboardText && (clipboardText.includes('claude.ai/share') || clipboardText.includes('claude.ai/chat'))) {
-            publicLink = clipboardText;
+        // Method 1: Try clipboard read (multiple attempts)
+        for (let attempt = 1; attempt <= 3 && !publicLink; attempt++) {
+          try {
+            console.log(`[Claude Publish] Clipboard read attempt ${attempt}/3...`);
+            const clipboardText = await navigator.clipboard.readText();
+            console.log('[Claude Publish] Clipboard content:', clipboardText?.substring(0, 100));
+            
+            if (clipboardText && clipboardText.includes('claude.ai')) {
+              publicLink = clipboardText.trim();
+              console.log('[Claude Publish] ✓ Got link from clipboard');
+              break;
+            }
+          } catch (clipboardError) {
+            console.warn(`[Claude Publish] Clipboard read attempt ${attempt} failed:`, clipboardError.message);
+            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500));
           }
-        } catch (clipboardError) {
-          console.warn('[Claude Publish] Clipboard read blocked:', clipboardError.message);
-          // Clipboard blocked, try fallback
         }
         
-        // Fallback: Try to extract from page elements
+        // Method 2: Search for input fields with the share link
         if (!publicLink) {
-          console.log('[Claude Publish] Trying fallback: searching page for link...');
-          const linkInputs = document.querySelectorAll('input[type="text"], input[type="url"], input[readonly]');
+          console.log('[Claude Publish] Method 2: Searching input fields...');
+          const linkInputs = document.querySelectorAll('input[type="text"], input[type="url"], input[readonly], input[value*="claude.ai"]');
           for (const input of linkInputs) {
             const value = input.value || input.getAttribute('value') || '';
-            if (value && (value.includes('claude.ai/share') || value.includes('claude.ai/chat'))) {
+            if (value && value.includes('claude.ai/share')) {
               publicLink = value;
-              console.log('[Claude Publish] Found link in page input:', publicLink);
+              console.log('[Claude Publish] ✓ Found share link in input:', publicLink.substring(0, 50));
               break;
+            }
+          }
+        }
+        
+        // Method 3: Look for any text elements with share links
+        if (!publicLink) {
+          console.log('[Claude Publish] Method 3: Searching text elements...');
+          const allText = document.body.innerText;
+          const shareMatch = allText.match(/https:\/\/claude\.ai\/share\/[a-zA-Z0-9-]+/);
+          if (shareMatch) {
+            publicLink = shareMatch[0];
+            console.log('[Claude Publish] ✓ Found share link in page text');
+          }
+        }
+        
+        // Method 4: Check for code/pre elements that might contain the link
+        if (!publicLink) {
+          console.log('[Claude Publish] Method 4: Checking code elements...');
+          const codeElements = document.querySelectorAll('code, pre, span[class*="link"], div[class*="url"]');
+          for (const el of codeElements) {
+            const text = el.textContent || el.innerText || '';
+            if (text.includes('claude.ai/share')) {
+              const match = text.match(/https:\/\/claude\.ai\/share\/[a-zA-Z0-9-]+/);
+              if (match) {
+                publicLink = match[0];
+                console.log('[Claude Publish] ✓ Found share link in code element');
+                break;
+              }
             }
           }
         }
