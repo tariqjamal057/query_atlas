@@ -495,82 +495,87 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         createLinkButton.click();
         
-        // Step 4: Wait for link to be created and appear in the dialog
-        console.log('[ChatGPT Publish] Step 4: Waiting for link to appear...');
-        let publicLink = null;
+        // Step 4: Wait for "Copy link" button to appear after link is generated
+        console.log('[ChatGPT Publish] Step 4: Waiting for "Copy link" button to appear...');
         
-        // Wait and look for the link to appear (it takes a moment to generate)
-        for (let i = 0; i < 20; i++) { // Try for up to 4 seconds
+        let copyLinkButton = null;
+        const dialog = document.querySelector('[role="dialog"], [role="alertdialog"], .modal, [data-radix-popper-content-wrapper]');
+        
+        // Wait for the "Copy link" button to appear (up to 5 seconds)
+        for (let i = 0; i < 25; i++) {
           await new Promise(resolve => setTimeout(resolve, 200));
           
-          // Method 1: Find input field within the dialog with the share link
-          const dialog = document.querySelector('[role="dialog"], [role="alertdialog"], .modal, [data-radix-popper-content-wrapper]');
           if (dialog) {
-            const linkInputs = dialog.querySelectorAll('input[type="text"], input[type="url"], input[readonly], input');
-            for (const input of linkInputs) {
-              const value = input.value || input.getAttribute('value') || '';
-              if (value && value.startsWith('https://chatgpt.com/')) {
-                publicLink = value;
-                console.log('[ChatGPT Publish] ✓ Found share link in dialog input:', publicLink.substring(0, 60));
-                break;
-              }
-            }
-            
-            if (publicLink) break;
-            
-            // Also check for any text nodes with the full link in the dialog
-            const dialogText = dialog.innerText || '';
-            const shareMatch = dialogText.match(/https:\/\/chatgpt\.com\/share\/[a-zA-Z0-9_-]+/);
-            if (shareMatch) {
-              publicLink = shareMatch[0];
-              console.log('[ChatGPT Publish] ✓ Found share link in dialog text:', publicLink.substring(0, 60));
-              break;
-            }
-          }
-        }
-        
-        // Method 2: Try to find and click a copy button, then read clipboard
-        if (!publicLink) {
-          console.log('[ChatGPT Publish] Method 2: Looking for copy button...');
-          const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
-          if (dialog) {
-            const copyButtons = dialog.querySelectorAll('button');
-            for (const btn of copyButtons) {
-              const text = (btn.textContent || btn.innerText || '').toLowerCase();
+            const buttons = dialog.querySelectorAll('button');
+            for (const btn of buttons) {
+              const text = (btn.textContent || btn.innerText || '').trim().toLowerCase();
               const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-              if (text.includes('copy') || ariaLabel.includes('copy')) {
-                console.log('[ChatGPT Publish] Found copy button, clicking...');
-                btn.click();
-                
-                // Wait and try to read clipboard
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                try {
-                  window.focus();
-                  document.body.focus();
-                  const clipboardText = await navigator.clipboard.readText();
-                  if (clipboardText && clipboardText.startsWith('https://chatgpt.com/')) {
-                    publicLink = clipboardText.trim();
-                    console.log('[ChatGPT Publish] ✓ Got link from clipboard after copy button');
-                    break;
-                  }
-                } catch (e) {
-                  console.log('[ChatGPT Publish] Clipboard read failed:', e.message);
+              
+              // Look specifically for "Copy link" button
+              if (text === 'copy link' || text.includes('copy link') || 
+                  ariaLabel === 'copy link' || ariaLabel.includes('copy link')) {
+                if (btn.offsetParent !== null) { // Check if visible
+                  copyLinkButton = btn;
+                  console.log('[ChatGPT Publish] ✓ "Copy link" button appeared and is visible');
+                  break;
                 }
               }
             }
           }
+          
+          if (copyLinkButton) break;
         }
         
-        // Method 3: Search all input fields on the page
-        if (!publicLink) {
-          console.log('[ChatGPT Publish] Method 3: Searching all input fields...');
-          const allInputs = document.querySelectorAll('input');
-          for (const input of allInputs) {
+        if (!copyLinkButton) {
+          sendResponse({
+            success: false,
+            error: 'Link created but "Copy link" button did not appear. Please copy the link manually.'
+          });
+          return;
+        }
+        
+        // Step 5: Click the "Copy link" button
+        console.log('[ChatGPT Publish] Step 5: Clicking "Copy link" button...');
+        
+        // Focus window before clicking to ensure clipboard access
+        window.focus();
+        document.body.focus();
+        
+        copyLinkButton.click();
+        
+        // Step 6: Wait and read from clipboard
+        console.log('[ChatGPT Publish] Step 6: Reading link from clipboard...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        let publicLink = null;
+        
+        // Try to read clipboard (multiple attempts)
+        for (let attempt = 1; attempt <= 3 && !publicLink; attempt++) {
+          try {
+            console.log(`[ChatGPT Publish] Clipboard read attempt ${attempt}/3...`);
+            const clipboardText = await navigator.clipboard.readText();
+            console.log('[ChatGPT Publish] Clipboard content:', clipboardText?.substring(0, 80));
+            
+            if (clipboardText && clipboardText.startsWith('https://chatgpt.com/')) {
+              publicLink = clipboardText.trim();
+              console.log('[ChatGPT Publish] ✓ Got full link from clipboard');
+              break;
+            }
+          } catch (clipboardError) {
+            console.warn(`[ChatGPT Publish] Clipboard read attempt ${attempt} failed:`, clipboardError.message);
+            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        }
+        
+        // Fallback: Try to find the link in the dialog input field
+        if (!publicLink && dialog) {
+          console.log('[ChatGPT Publish] Fallback: Searching for link in dialog input...');
+          const linkInputs = dialog.querySelectorAll('input');
+          for (const input of linkInputs) {
             const value = input.value || input.getAttribute('value') || '';
             if (value && value.startsWith('https://chatgpt.com/share/')) {
               publicLink = value;
-              console.log('[ChatGPT Publish] ✓ Found share link in page input');
+              console.log('[ChatGPT Publish] ✓ Found link in dialog input field');
               break;
             }
           }
