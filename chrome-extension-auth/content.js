@@ -495,55 +495,84 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         createLinkButton.click();
         
-        // Step 4: Wait for link to be created and copied
-        console.log('[ChatGPT Publish] Step 4: Waiting for link creation...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Step 5: Try to read clipboard
-        console.log('[ChatGPT Publish] Step 5: Attempting to get share link...');
+        // Step 4: Wait for link to be created and appear in the dialog
+        console.log('[ChatGPT Publish] Step 4: Waiting for link to appear...');
         let publicLink = null;
         
-        // Method 1: Try clipboard read (multiple attempts)
-        for (let attempt = 1; attempt <= 3 && !publicLink; attempt++) {
-          try {
-            console.log(`[ChatGPT Publish] Clipboard read attempt ${attempt}/3...`);
-            const clipboardText = await navigator.clipboard.readText();
-            console.log('[ChatGPT Publish] Clipboard content:', clipboardText?.substring(0, 100));
+        // Wait and look for the link to appear (it takes a moment to generate)
+        for (let i = 0; i < 20; i++) { // Try for up to 4 seconds
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Method 1: Find input field within the dialog with the share link
+          const dialog = document.querySelector('[role="dialog"], [role="alertdialog"], .modal, [data-radix-popper-content-wrapper]');
+          if (dialog) {
+            const linkInputs = dialog.querySelectorAll('input[type="text"], input[type="url"], input[readonly], input');
+            for (const input of linkInputs) {
+              const value = input.value || input.getAttribute('value') || '';
+              if (value && value.startsWith('https://chatgpt.com/')) {
+                publicLink = value;
+                console.log('[ChatGPT Publish] ✓ Found share link in dialog input:', publicLink.substring(0, 60));
+                break;
+              }
+            }
             
-            if (clipboardText && clipboardText.includes('chatgpt.com')) {
-              publicLink = clipboardText.trim();
-              console.log('[ChatGPT Publish] ✓ Got link from clipboard');
+            if (publicLink) break;
+            
+            // Also check for any text nodes with the full link in the dialog
+            const dialogText = dialog.innerText || '';
+            const shareMatch = dialogText.match(/https:\/\/chatgpt\.com\/share\/[a-zA-Z0-9_-]+/);
+            if (shareMatch) {
+              publicLink = shareMatch[0];
+              console.log('[ChatGPT Publish] ✓ Found share link in dialog text:', publicLink.substring(0, 60));
               break;
             }
-          } catch (clipboardError) {
-            console.warn(`[ChatGPT Publish] Clipboard read attempt ${attempt} failed:`, clipboardError.message);
-            if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
         
-        // Method 2: Search for input fields with the share link
+        // Method 2: Try to find and click a copy button, then read clipboard
         if (!publicLink) {
-          console.log('[ChatGPT Publish] Method 2: Searching input fields...');
-          const linkInputs = document.querySelectorAll('input[type="text"], input[type="url"], input[readonly], input[value*="chatgpt.com"]');
-          for (const input of linkInputs) {
+          console.log('[ChatGPT Publish] Method 2: Looking for copy button...');
+          const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
+          if (dialog) {
+            const copyButtons = dialog.querySelectorAll('button');
+            for (const btn of copyButtons) {
+              const text = (btn.textContent || btn.innerText || '').toLowerCase();
+              const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+              if (text.includes('copy') || ariaLabel.includes('copy')) {
+                console.log('[ChatGPT Publish] Found copy button, clicking...');
+                btn.click();
+                
+                // Wait and try to read clipboard
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                try {
+                  window.focus();
+                  document.body.focus();
+                  const clipboardText = await navigator.clipboard.readText();
+                  if (clipboardText && clipboardText.startsWith('https://chatgpt.com/')) {
+                    publicLink = clipboardText.trim();
+                    console.log('[ChatGPT Publish] ✓ Got link from clipboard after copy button');
+                    break;
+                  }
+                } catch (e) {
+                  console.log('[ChatGPT Publish] Clipboard read failed:', e.message);
+                }
+              }
+            }
+          }
+        }
+        
+        // Method 3: Search all input fields on the page
+        if (!publicLink) {
+          console.log('[ChatGPT Publish] Method 3: Searching all input fields...');
+          const allInputs = document.querySelectorAll('input');
+          for (const input of allInputs) {
             const value = input.value || input.getAttribute('value') || '';
-            if (value && (value.includes('chatgpt.com/share') || value.includes('chatgpt.com/c/'))) {
+            if (value && value.startsWith('https://chatgpt.com/share/')) {
               publicLink = value;
-              console.log('[ChatGPT Publish] ✓ Found share link in input:', publicLink.substring(0, 50));
+              console.log('[ChatGPT Publish] ✓ Found share link in page input');
               break;
             }
-          }
-        }
-        
-        // Method 3: Look for text elements with share links
-        if (!publicLink) {
-          console.log('[ChatGPT Publish] Method 3: Searching text elements...');
-          const allText = document.body.innerText;
-          const shareMatch = allText.match(/https:\/\/chatgpt\.com\/share\/[a-zA-Z0-9-]+/) || 
-                            allText.match(/https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+/);
-          if (shareMatch) {
-            publicLink = shareMatch[0];
-            console.log('[ChatGPT Publish] ✓ Found share link in page text');
           }
         }
         
