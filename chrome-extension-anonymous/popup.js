@@ -308,25 +308,20 @@ autoShareCheckbox?.addEventListener('change', async () => {
     
     showStatus(`Triggering ${platformName} publish...`, 'info');
     
-    // IMPORTANT: Ensure the tab is focused for clipboard access
-    await chrome.tabs.update(tab.id, { active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
-    
-    // Wait a moment for focus to take effect
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Try to inject content script first
+    // Try to inject content script first (if needed)
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['content.js']
       });
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Content script injected');
+      await new Promise(resolve => setTimeout(resolve, 300));
     } catch (e) {
       console.log('Content script already loaded');
     }
     
     // Send message to content script to publish
+    // Note: The content script will handle its own focus management
     const response = await chrome.tabs.sendMessage(tab.id, { action: publishAction });
     
     if (response && response.success) {
