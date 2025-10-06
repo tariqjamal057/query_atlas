@@ -285,29 +285,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('[Claude Publish] Found Share button, clicking...');
         publishButton.click();
         
-        // Step 2: Wait for dialog and find "Publish and Copy link" button
-        console.log('[Claude Publish] Step 2: Waiting for publish dialog...');
+        // Step 2: Wait for dialog and select "Public Access"
+        console.log('[Claude Publish] Step 2: Waiting for share dialog...');
         await new Promise(resolve => setTimeout(resolve, 1500));
         
+        // Find and click "Public Access" option
+        console.log('[Claude Publish] Step 2a: Selecting Public Access...');
+        const publicAccessButton = await findPublicAccessButton();
+        
+        if (!publicAccessButton) {
+          console.warn('[Claude Publish] Could not find Public Access button, continuing...');
+          // Don't fail here, as it might already be selected
+        } else {
+          console.log('[Claude Publish] Found Public Access button, clicking...');
+          publicAccessButton.click();
+          // Wait for the option to be selected
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Step 3: Find and click "Copy link" button
+        console.log('[Claude Publish] Step 3: Finding Copy link button...');
         const copyLinkButton = await findCopyLinkButton();
         
         if (!copyLinkButton) {
           sendResponse({
             success: false,
-            error: 'Publish dialog opened but could not find "Publish and Copy link" or "Copy link" button. Try publishing manually.'
+            error: 'Share dialog opened but could not find "Copy link" button. Try sharing manually.'
           });
           return;
         }
         
-        console.log('[Claude Publish] Found copy link button, clicking...');
+        console.log('[Claude Publish] Found Copy link button, clicking...');
         copyLinkButton.click();
         
-        // Step 3: Wait for clipboard operation to complete
-        console.log('[Claude Publish] Step 3: Waiting for clipboard...');
+        // Step 4: Wait for clipboard operation to complete
+        console.log('[Claude Publish] Step 4: Waiting for clipboard...');
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Step 4: Attempt to read clipboard
-        console.log('[Claude Publish] Step 4: Reading clipboard...');
+        // Step 5: Attempt to read clipboard
+        console.log('[Claude Publish] Step 5: Reading clipboard...');
         let publicLink = null;
         
         try {
@@ -392,6 +408,33 @@ async function findPublishButton() {
   return null;
 }
 
+// Helper function to find Public Access button
+async function findPublicAccessButton() {
+  // Strategy 1: Common selectors
+  const selectors = [
+    'button[aria-label*="Public"]',
+    'button[title*="Public"]',
+    'button[aria-label*="Public Access"]',
+    '[data-testid*="public-access"]'
+  ];
+  
+  for (const selector of selectors) {
+    const btn = document.querySelector(selector);
+    if (btn) return btn;
+  }
+  
+  // Strategy 2: Text-based search
+  const allButtons = document.querySelectorAll('button, div[role="button"], div[role="option"]');
+  for (const btn of allButtons) {
+    const text = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+    if (text === 'public' || text === 'public access' || text.includes('anyone on internet')) {
+      return btn;
+    }
+  }
+  
+  return null;
+}
+
 // Helper function to find Copy Link button
 async function findCopyLinkButton() {
   // Strategy 1: Common selectors
@@ -411,7 +454,7 @@ async function findCopyLinkButton() {
   const allButtons = document.querySelectorAll('button');
   for (const btn of allButtons) {
     const text = (btn.textContent || btn.innerText || '').toLowerCase();
-    if ((text.includes('copy') && text.includes('link')) || text.includes('publish and copy')) {
+    if ((text.includes('copy') && text.includes('link')) || text.includes('publish and copy') || text === 'copy link') {
       return btn;
     }
   }
