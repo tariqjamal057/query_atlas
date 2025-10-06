@@ -445,23 +445,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('[ChatGPT Publish] Found Share button, clicking...');
         shareButton.click();
         
-        // Step 2: Wait for dialog to appear
-        console.log('[ChatGPT Publish] Step 2: Waiting for share dialog...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Step 2: Wait for dialog to appear and be fully loaded
+        console.log('[ChatGPT Publish] Step 2: Waiting for share dialog to load...');
         
-        // Step 3: Find and click "Create link" or "Update link" button
-        console.log('[ChatGPT Publish] Step 3: Finding Create/Update link button...');
-        const createLinkButton = await findChatGPTCreateLinkButton();
+        // Wait for dialog/modal to appear (try multiple selectors)
+        let dialogReady = false;
+        for (let i = 0; i < 20; i++) { // Try for up to 4 seconds (20 * 200ms)
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          const dialog = document.querySelector('[role="dialog"], [role="alertdialog"], .modal, [data-radix-popper-content-wrapper]');
+          if (dialog && dialog.offsetParent !== null) { // Check if visible
+            console.log('[ChatGPT Publish] ✓ Dialog appeared');
+            dialogReady = true;
+            break;
+          }
+        }
+        
+        if (!dialogReady) {
+          console.log('[ChatGPT Publish] Warning: Dialog did not appear, continuing anyway...');
+        }
+        
+        // Step 3: Wait for Create/Update link button to appear and be ready
+        console.log('[ChatGPT Publish] Step 3: Waiting for Create/Update link button...');
+        
+        let createLinkButton = null;
+        for (let i = 0; i < 15; i++) { // Try for up to 3 seconds (15 * 200ms)
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          createLinkButton = await findChatGPTCreateLinkButton();
+          if (createLinkButton && createLinkButton.offsetParent !== null) { // Check if visible
+            console.log('[ChatGPT Publish] ✓ Create/Update button found and visible');
+            break;
+          }
+        }
         
         if (!createLinkButton) {
           sendResponse({
             success: false,
-            error: 'Share dialog opened but could not find "Create link" or "Update link" button.'
+            error: 'Share dialog opened but could not find "Create link" or "Update link" button. Please try again.'
           });
           return;
         }
         
-        console.log('[ChatGPT Publish] Found Create/Update button, clicking...');
+        console.log('[ChatGPT Publish] Clicking Create/Update button...');
         
         // Focus window before clicking
         window.focus();
