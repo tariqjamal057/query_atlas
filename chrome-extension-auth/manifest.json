@@ -12,7 +12,8 @@
     "scripting",
     "alarms",
     "management",
-    "identity"
+    "identity",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",

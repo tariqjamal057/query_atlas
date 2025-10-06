@@ -10,7 +10,8 @@
     "contextMenus",
     "notifications",
     "scripting",
-    "alarms"
+    "alarms",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
