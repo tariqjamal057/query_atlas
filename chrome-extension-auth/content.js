@@ -270,19 +270,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
         
-        // Step 1: Find and click the Publish button
-        console.log('[Claude Publish] Step 1: Finding Publish button...');
+        // Step 1: Find and click the Share/Publish button
+        console.log('[Claude Publish] Step 1: Finding Share button...');
         const publishButton = await findPublishButton();
         
         if (!publishButton) {
           sendResponse({
             success: false,
-            error: 'Could not find Publish button. Make sure you have a conversation open and it\'s not already published.'
+            error: 'Could not find Share button. Make sure you have a conversation open and it\'s not already published.'
           });
           return;
         }
         
-        console.log('[Claude Publish] Found Publish button, clicking...');
+        console.log('[Claude Publish] Found Share button, clicking...');
         publishButton.click();
         
         // Step 2: Wait for dialog and find "Publish and Copy link" button
@@ -362,14 +362,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Helper function to find Publish button with multiple strategies
+// Helper function to find Publish/Share button with multiple strategies
 async function findPublishButton() {
-  // Strategy 1: Common selectors
+  // Strategy 1: Common selectors (updated for new "Share" button)
   const selectors = [
-    'button[aria-label*="Publish"]',
+    'button[aria-label*="Share"]',
+    'button[title*="Share"]',
+    'button[aria-label*="Publish"]', // Backward compatibility
     'button[title*="Publish"]',
     'button[aria-label*="Post"]',
-    '[data-testid*="publish-button"]'
+    '[data-testid*="publish-button"]',
+    '[data-testid*="share-button"]'
   ];
   
   for (const selector of selectors) {
@@ -377,11 +380,11 @@ async function findPublishButton() {
     if (btn) return btn;
   }
   
-  // Strategy 2: Text-based search
+  // Strategy 2: Text-based search (updated for "Share")
   const allButtons = document.querySelectorAll('button');
   for (const btn of allButtons) {
     const text = (btn.textContent || btn.innerText || '').toLowerCase();
-    if (text.includes('publish') || text.includes('post to')) {
+    if (text.includes('share') || text.includes('publish') || text.includes('post to')) {
       return btn;
     }
   }

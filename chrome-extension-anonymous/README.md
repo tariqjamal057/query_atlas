@@ -33,8 +33,8 @@ This is the **simple, anonymous version** of the LLM Archive Chrome extension th
 When you're on a Claude.ai conversation:
 1. Check the "Post and Share to Anyone on Internet" checkbox
 2. The extension will automatically:
-   - Click the "Publish" button
-   - Select "Publish and Copy link" in the dialog
+   - Click the "Share" button
+   - Select the copy link option in the dialog
    - Capture the public share link
    - Fill it into the "Public Share Link" field
 
