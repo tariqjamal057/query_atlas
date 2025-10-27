@@ -42,3 +42,5 @@ Thumbs.db
 # Chrome extension builds
 chrome-extension-auth.zip
 chrome-extension-anonymous.zip
+
+.local/
